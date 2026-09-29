@@ -1,0 +1,188 @@
+{
+  "_note": "Recorded from the live Jikan v4 API on 2026-09-29 (GET /v4/top/anime and GET /v4/anime/199). Field names, nesting, casing and null-placement are verbatim so the mapper is tested against the shape the real service returns. Synopsis prose is abbreviated - only its presence and type matter here.",
+  "topAnime": {
+    "pagination": {
+      "last_visible_page": 1216,
+      "has_next_page": true,
+      "current_page": 1,
+      "items": { "count": 25, "total": 30399, "per_page": 25 }
+    },
+    "data": [
+      {
+        "mal_id": 52991,
+        "url": "https://myanimelist.net/anime/52991/Sousou_no_Frieren",
+        "images": {
+          "jpg": {
+            "image_url": "https://cdn.myanimelist.net/images/anime/1015/138006.jpg",
+            "small_image_url": "https://cdn.myanimelist.net/images/anime/1015/138006t.jpg",
+            "large_image_url": "https://cdn.myanimelist.net/images/anime/1015/138006l.jpg"
+          },
+          "webp": {
+            "image_url": "https://cdn.myanimelist.net/images/anime/1015/138006.webp",
+            "small_image_url": "https://cdn.myanimelist.net/images/anime/1015/138006t.webp",
+            "large_image_url": "https://cdn.myanimelist.net/images/anime/1015/138006l.webp"
+          }
+        },
+        "trailer": {
+          "youtube_id": null,
+          "url": null,
+          "embed_url": "https://www.youtube-nocookie.com/embed/ZEkwCGJ3o7M?enablejsapi=1&wmode=opaque&autoplay=1",
+          "images": {
+            "image_url": null,
+            "small_image_url": null,
+            "medium_image_url": null,
+            "large_image_url": null,
+            "maximum_image_url": null
+          }
+        },
+        "approved": true,
+        "titles": [
+          { "type": "Default", "title": "Sousou no Frieren" },
+          { "type": "Japanese", "title": "葬送のフリーレン" },
+          { "type": "English", "title": "Frieren: Beyond Journey's End" }
+        ],
+        "title": "Sousou no Frieren",
+        "title_english": "Frieren: Beyond Journey's End",
+        "title_japanese": "葬送のフリーレン",
+        "title_synonyms": ["Frieren at the Funeral", "Frieren The Slayer"],
+        "type": "TV",
+        "source": "Manga",
+        "episodes": 28,
+        "status": "Finished Airing",
+        "airing": false,
+        "aired": {
+          "from": "2023-09-29T00:00:00+00:00",
+          "to": "2024-03-22T00:00:00+00:00",
+          "prop": {
+            "from": { "day": 29, "month": 9, "year": 2023 },
+            "to": { "day": 22, "month": 3, "year": 2024 }
+          },
+          "string": "Sep 29, 2023 to Mar 22, 2024"
+        },
+        "duration": "24 min per ep",
+        "rating": "PG-13 - Teens 13 or older",
+        "score": 9.26,
+        "scored_by": 911197,
+        "rank": 1,
+        "popularity": 102,
+        "members": 1477531,
+        "favorites": 91494,
+        "synopsis": "During their decade-long quest to defeat the Demon King, the members of the hero's party forge bonds through adventures and battles. [abbreviated for fixture]",
+        "season": "fall",
+        "year": 2023,
+        "broadcast": { "day": "Fridays", "time": "23:00", "timezone": "Asia/Tokyo", "string": "Fridays at 23:00 (JST)" },
+        "studios": [{ "mal_id": 11, "type": "anime", "name": "Madhouse", "url": "https://myanimelist.net/anime/producer/11/Madhouse" }],
+        "genres": [
+          { "mal_id": 2, "type": "anime", "name": "Adventure", "url": "https://myanimelist.net/anime/genre/2/Adventure" },
+          { "mal_id": 46, "type": "anime", "name": "Award Winning", "url": "https://myanimelist.net/anime/genre/46/Award_Winning" },
+          { "mal_id": 8, "type": "anime", "name": "Drama", "url": "https://myanimelist.net/anime/genre/8/Drama" },
+          { "mal_id": 10, "type": "anime", "name": "Fantasy", "url": "https://myanimelist.net/anime/genre/10/Fantasy" }
+        ],
+        "explicit_genres": [],
+        "themes": [],
+        "demographics": [{ "mal_id": 27, "type": "anime", "name": "Shounen", "url": "https://myanimelist.net/anime/genre/27/Shounen" }]
+      },
+      {
+        "mal_id": 61316,
+        "url": "https://myanimelist.net/anime/61316/Re_Zero_kara_Hajimeru_Isekai_Seikatsu_4th_Season",
+        "images": {
+          "jpg": {
+            "image_url": "https://cdn.myanimelist.net/images/anime/1540/155824.jpg",
+            "large_image_url": "https://cdn.myanimelist.net/images/anime/1540/155824l.jpg"
+          }
+        },
+        "trailer": {
+          "youtube_id": null,
+          "url": null,
+          "embed_url": "https://www.youtube-nocookie.com/embed/jVl4bY81iIs?enablejsapi=1&wmode=opaque&autoplay=1",
+          "images": { "maximum_image_url": null }
+        },
+        "approved": true,
+        "title": "Re:Zero kara Hajimeru Isekai Seikatsu 4th Season",
+        "title_english": "Re:ZERO -Starting Life in Another World- Season 4",
+        "title_japanese": "Re:ゼロから始める異世界生活 4th season",
+        "type": "TV",
+        "source": "Light novel",
+        "episodes": 19,
+        "status": "Currently Airing",
+        "airing": true,
+        "aired": {
+          "from": "2026-04-08T00:00:00+00:00",
+          "to": null,
+          "prop": { "from": { "day": 8, "month": 4, "year": 2026 }, "to": { "day": null, "month": null, "year": null } },
+          "string": "Apr 8, 2026 to ?"
+        },
+        "duration": "23 min per ep",
+        "rating": "R - 17+ (violence & profanity)",
+        "score": 9.17,
+        "scored_by": 83439,
+        "rank": 2,
+        "popularity": 984,
+        "members": 288542,
+        "synopsis": "Subaru and his allies search for a way to undo what the Authority of Gluttony took from them. [abbreviated for fixture]",
+        "season": null,
+        "year": null,
+        "studios": [{ "mal_id": 314, "type": "anime", "name": "White Fox", "url": "https://myanimelist.net/anime/producer/314/White_Fox" }],
+        "genres": [
+          { "mal_id": 8, "type": "anime", "name": "Drama", "url": "https://myanimelist.net/anime/genre/8/Drama" },
+          { "mal_id": 10, "type": "anime", "name": "Fantasy", "url": "https://myanimelist.net/anime/genre/10/Fantasy" }
+        ],
+        "themes": [],
+        "demographics": []
+      }
+    ]
+  },
+  "singleAnime": {
+    "data": {
+      "mal_id": 199,
+      "url": "https://myanimelist.net/anime/199/Sen_to_Chihiro_no_Kamikakushi",
+      "images": {
+        "jpg": {
+          "image_url": "https://cdn.myanimelist.net/images/anime/6/79597.jpg",
+          "small_image_url": "https://cdn.myanimelist.net/images/anime/6/79597t.jpg",
+          "large_image_url": "https://cdn.myanimelist.net/images/anime/6/79597l.jpg"
+        }
+      },
+      "trailer": {
+        "youtube_id": null,
+        "url": null,
+        "embed_url": "https://www.youtube-nocookie.com/embed/ByXuk9QqQkk?enablejsapi=1&wmode=opaque&autoplay=1",
+        "images": { "maximum_image_url": null }
+      },
+      "approved": true,
+      "title": "Sen to Chihiro no Kamikakushi",
+      "title_english": "Spirited Away",
+      "title_japanese": "千と千尋の神隠し",
+      "title_synonyms": ["Sen and Chihiro's Spiriting Away"],
+      "type": "Movie",
+      "source": "Original",
+      "episodes": 1,
+      "status": "Finished Airing",
+      "airing": false,
+      "aired": {
+        "from": "2001-07-20T00:00:00+00:00",
+        "to": null,
+        "prop": { "from": { "day": 20, "month": 7, "year": 2001 }, "to": { "day": null, "month": null, "year": null } },
+        "string": "Jul 20, 2001"
+      },
+      "duration": "2 hr 4 min",
+      "rating": "PG - Children",
+      "score": 8.77,
+      "scored_by": 1421167,
+      "rank": 46,
+      "popularity": 45,
+      "members": 2041747,
+      "synopsis": "Ten-year-old Chihiro Ogino is trapped in the spirit world and must work to free her parents. [abbreviated for fixture]",
+      "season": null,
+      "year": null,
+      "studios": [{ "mal_id": 21, "type": "anime", "name": "Studio Ghibli", "url": "https://myanimelist.net/anime/producer/21/Studio_Ghibli" }],
+      "genres": [
+        { "mal_id": 2, "type": "anime", "name": "Adventure", "url": "https://myanimelist.net/anime/genre/2/Adventure" },
+        { "mal_id": 46, "type": "anime", "name": "Award Winning", "url": "https://myanimelist.net/anime/genre/46/Award_Winning" },
+        { "mal_id": 10, "type": "anime", "name": "Fantasy", "url": "https://myanimelist.net/anime/genre/10/Fantasy" }
+      ],
+      "themes": [{ "mal_id": 6, "type": "anime", "name": "Mythology", "url": "https://myanimelist.net/anime/genre/6/Mythology" }],
+      "demographics": []
+    }
+  }
+}

@@ -3,12 +3,15 @@
 import { motion, useMotionValue, useReducedMotion, useSpring, type MotionStyle } from 'framer-motion';
 import { useRef, useState, type PointerEvent } from 'react';
 import { resolveLocalPreviewUrl } from '@/lib/preview-url';
-import type { MediaCatalogRecord } from '@/types/media';
+import { formatLabel } from '@/lib/anime/text';
+import type { AnimeSummary } from '@/types/anime';
 
 interface CatalogCardProps {
-  item: MediaCatalogRecord;
-  onSelect: (item: MediaCatalogRecord) => void;
+  item: AnimeSummary;
+  onSelect: (item: AnimeSummary) => void;
 }
+
+const FALLBACK_POSTER = '/posters/aurora.jpg';
 
 export function CatalogCard({ item, onSelect }: CatalogCardProps) {
   const previewSource = resolveLocalPreviewUrl(item.previewUrl);
@@ -21,6 +24,7 @@ export function CatalogCard({ item, onSelect }: CatalogCardProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [previewArmed, setPreviewArmed] = useState(false);
   const [previewReady, setPreviewReady] = useState(false);
+  const [posterSrc, setPosterSrc] = useState(item.coverImage || FALLBACK_POSTER);
 
   const cardStyle: MotionStyle = {
     rotateX: springRotateX,
@@ -65,7 +69,14 @@ export function CatalogCard({ item, onSelect }: CatalogCardProps) {
     rotateY.set(0);
   };
 
-  const handleFocus = () => startPreview();
+  const score = item.averageScore != null ? Math.round(item.averageScore) / 10 : null;
+  const episodeLabel = item.format === 'MOVIE'
+    ? 'Movie'
+    : item.episodeCount
+      ? `${item.episodeCount} ep`
+      : item.status === 'RELEASING'
+        ? 'Airing'
+        : formatLabel(item.format);
 
   return (
     <article className="media-card-wrap">
@@ -74,16 +85,24 @@ export function CatalogCard({ item, onSelect }: CatalogCardProps) {
           type="button"
           className="media-card"
           style={cardStyle}
-          aria-label={`Open ${item.title}, ${item.genre}, ${item.year}`}
+          aria-label={`Open ${item.title}${item.year ? `, ${item.year}` : ''}${item.genres[0] ? `, ${item.genres[0]}` : ''}`}
           onClick={() => onSelect(item)}
           onPointerEnter={(event) => { if (event.pointerType === 'mouse') startPreview(); }}
           onPointerMove={updateTilt}
           onPointerLeave={() => { stopPreview(); resetTilt(); }}
-          onFocus={handleFocus}
+          onFocus={startPreview}
           onBlur={() => { stopPreview(); resetTilt(); }}
         >
           <div className="poster-frame">
-            <img className="poster-image" src={item.coverPoster} alt="" loading="lazy" decoding="async" />
+            <img
+              className="poster-image"
+              src={posterSrc}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+              onError={() => setPosterSrc(FALLBACK_POSTER)}
+            />
             {previewArmed && previewSource ? (
               <video
                 ref={videoRef}
@@ -101,15 +120,20 @@ export function CatalogCard({ item, onSelect }: CatalogCardProps) {
               />
             ) : null}
             <span className="poster-shade" aria-hidden="true" />
+            {score !== null ? <span className="card-score" aria-hidden="true">★ {score.toFixed(1)}</span> : null}
             <span className="card-play-mark" aria-hidden="true">▶</span>
+            <span className="card-corner" aria-hidden="true">{episodeLabel}</span>
           </div>
         </motion.button>
       </div>
       <div className="card-meta">
-        <h3>{item.title}</h3>
-        <span className="card-year">{item.year}</span>
+        <h3 title={item.title}>{item.title}</h3>
       </div>
-      <p className="card-subline"><span>{item.genre}</span><span>{item.format}</span></p>
+      <p className="card-subline">
+        <span>{item.year ?? 'TBA'}</span>
+        <span>{formatLabel(item.format)}</span>
+        {item.genres[0] ? <span>{item.genres[0]}</span> : null}
+      </p>
     </article>
   );
 }

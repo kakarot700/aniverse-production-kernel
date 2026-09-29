@@ -7,8 +7,27 @@
     "noEmit": false,
     "incremental": false,
     "outDir": ".test-dist",
-    "types": ["node"],
-    "rootDir": "."
+    "types": [
+      "node"
+    ],
+    "rootDir": ".",
+    "jsx": "react-jsx"
   },
-  "include": ["tests/**/*.test.ts", "lib/media-proxy.ts", "lib/watch-sync.ts"]
+  "include": [
+    "tests/**/*.test.ts",
+    "lib/media-proxy.ts",
+    "lib/media-proxy-core.ts",
+    "lib/watch-sync.ts",
+    "lib/preview-url.ts",
+    "lib/stream-url.ts",
+    "lib/streams/definitions.ts",
+    "lib/streams/registry.ts",
+    "lib/anime/text.ts",
+    "lib/anime/cache.ts",
+    "lib/anime/offline.ts",
+    "types/anime.ts",
+    "types/media.ts",
+    "lib/anime/jikan.ts",
+    "tests/jikan-live-shape.test.ts"
+  ]
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useState } from 'react';
 import { useWatchRoom } from '@/hooks/useWatchRoom';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 
@@ -19,16 +19,21 @@ function updateRoomUrl(roomId: string): void {
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
-interface WatchRoomPanelProps { videoRef: RefObject<HTMLVideoElement | null> }
+interface WatchRoomPanelProps {
+  video: HTMLVideoElement | null;
+}
 
-export function WatchRoomPanel({ videoRef }: WatchRoomPanelProps) {
+export function WatchRoomPanel({ video }: WatchRoomPanelProps) {
   const [roomId, setRoomId] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
-  const connected = isSupabaseConfigured();
-  const room = useWatchRoom(videoRef, roomId);
+  const [connected, setConnected] = useState(false);
+  const room = useWatchRoom(video, roomId);
 
   useEffect(() => {
+    // Env reads are evaluated at module scope during SSR; resolve on the client
+    // so the first paint matches the server markup.
+    setConnected(isSupabaseConfigured());
     const existingRoom = getRoomFromUrl();
     if (existingRoom) setRoomId(existingRoom);
   }, []);
@@ -76,7 +81,7 @@ export function WatchRoomPanel({ videoRef }: WatchRoomPanelProps) {
   return (
     <aside className="room-panel" aria-labelledby="watch-room-title">
       <h3 id="watch-room-title">Watch together</h3>
-      <p>Share a room to follow play, pause, and seek updates. Sync is best-effort over your network.</p>
+      <p>Share a room to follow play, pause and seek updates. Sync is best-effort over your network.</p>
       <div className="room-actions">
         {!roomId ? (
           <button className="button-primary" type="button" onClick={createRoom} disabled={!connected}>Create a room</button>
@@ -95,7 +100,13 @@ export function WatchRoomPanel({ videoRef }: WatchRoomPanelProps) {
         </form>
       ) : <p className="room-code" aria-label="Current room ID">{roomId}</p>}
       <p className="room-status" role="status" aria-live="polite">{room.error || copyStatus || stateLabel}</p>
-      {roomId ? <div className="room-metrics"><span>{stateLabel}</span><span>{room.driftMs === null ? '—' : `Drift ${room.driftMs} ms`}</span><span>{room.roundTripMs === null ? '—' : `RTT ${room.roundTripMs} ms`}</span></div> : null}
+      {roomId ? (
+        <div className="room-metrics">
+          <span>{room.peers > 0 ? `${room.peers} peer${room.peers === 1 ? '' : 's'}` : stateLabel}</span>
+          <span>{room.driftMs === null ? '—' : `Drift ${room.driftMs} ms`}</span>
+          <span>{room.roundTripMs === null ? '—' : `RTT ${room.roundTripMs} ms`}</span>
+        </div>
+      ) : null}
       {!connected ? <p className="room-status">Configure the public Supabase URL and publishable key to enable room sync.</p> : null}
     </aside>
   );

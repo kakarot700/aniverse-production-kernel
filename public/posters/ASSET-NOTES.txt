@@ -1,1 +1,17 @@
-The attached starter archive supplied no video clips. This project ships no generated, synthesized, or transcoded video. Poster files were collected from visual-search results for layout prototyping; no visible stock watermark was observed, but source licensing has not been independently verified. Replace them with artwork that is owned or properly licensed before public commercial launch. `bleach-tybw.jpg` is an original AI-generated placeholder key art for the `/api/catalog` server-catalog record; replace it with owned or licensed artwork the same way. See `docs/PREVIEW-ASSETS.md` for how to add a real optional preview clip.
+These posters are no longer the catalog's artwork. Live cover art and banners
+come from the AniList CDN (s4.anilist.co) or, on the MyAnimeList fallback
+path, cdn.myanimelist.net.
+
+They are still used for two things:
+  1. the bundled offline sample library (lib/anime/offline.ts), which only
+     answers when every live catalog source is unreachable;
+  2. the fallback image a card shows if a remote poster fails to load.
+
+Provenance: collected from visual-search results for layout prototyping; no
+visible stock watermark was observed, but source licensing has not been
+independently verified. `bleach-tybw.jpg` is an original AI-generated
+placeholder. Replace all of them with artwork you own or have licensed before
+a public commercial launch.
+
+No video clips ship with this repository. See docs/PREVIEW-ASSETS.md for how
+to add an authorized `/previews/<slug>.webm` hover loop.
