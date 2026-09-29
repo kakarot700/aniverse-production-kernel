@@ -1,6 +1,12 @@
 export interface StreamMirrorNode {
   serverName: string;
   manifestUrl: string;
+  /**
+   * Tier hint from the trusted catalog source: `true` means the mirror must be
+   * served through the same-origin `/api/proxy` allowlist, `false` means it can
+   * be addressed directly. Omitting it defaults to `true` (always proxy).
+   */
+  requiresProxy?: boolean;
 }
 
 export interface MediaEpisodePayload {
