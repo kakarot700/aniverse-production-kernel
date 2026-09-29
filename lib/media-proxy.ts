@@ -44,35 +44,72 @@ function makeProxyUrl(target: URL, proxyEndpoint: string): string {
   return `${proxy.pathname}${proxy.search}`;
 }
 
+/**
+ * Rewrites every nested playlist, segment, key and init-section reference in
+ * an HLS manifest back through the same-origin proxy so the browser never
+ * contacts the upstream origin directly.
+ */
 export function rewriteHlsManifest(manifest: string, manifestUrl: string, proxyEndpoint = '/api/proxy'): string {
   const base = new URL(manifestUrl);
-  return manifest.split(/\r?\n/).map((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return line;
+  return manifest
+    .split(/\r?\n/)
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return line;
 
-    if (trimmed.startsWith('#')) {
-      return line.replace(/URI="([^"]+)"/g, (attribute, rawUri: string) => {
-        try {
-          const target = new URL(rawUri, base);
-          if (target.protocol !== 'https:' && target.protocol !== 'http:') return attribute;
-          return `URI="${makeProxyUrl(target, proxyEndpoint)}"`;
-        } catch {
-          return attribute;
-        }
-      });
-    }
+      if (trimmed.startsWith('#')) {
+        return line.replace(/URI="([^"]+)"/g, (attribute, rawUri: string) => {
+          try {
+            const target = new URL(rawUri, base);
+            if (target.protocol !== 'https:' && target.protocol !== 'http:') return attribute;
+            return `URI="${makeProxyUrl(target, proxyEndpoint)}"`;
+          } catch {
+            return attribute;
+          }
+        });
+      }
 
-    try {
-      const target = new URL(trimmed, base);
-      if (target.protocol !== 'https:' && target.protocol !== 'http:') return line;
-      return makeProxyUrl(target, proxyEndpoint);
-    } catch {
-      return line;
-    }
-  }).join('\n');
+      try {
+        const target = new URL(trimmed, base);
+        if (target.protocol !== 'https:' && target.protocol !== 'http:') return line;
+        return makeProxyUrl(target, proxyEndpoint);
+      } catch {
+        return line;
+      }
+    })
+    .join('\n');
 }
 
 export function parseAllowedHosts(value: string | undefined): string[] {
   if (!value) return [];
   return value.split(',').map((host) => host.trim().toLowerCase().replace(/\.$/, '')).filter(Boolean);
+}
+
+export function looksLikeHlsPlaylist(contentType: string, pathname: string): boolean {
+  const type = contentType.toLowerCase();
+  return (
+    type.includes('mpegurl') ||
+    type.includes('vnd.apple.mpegurl') ||
+    pathname.toLowerCase().endsWith('.m3u8') ||
+    pathname.toLowerCase().endsWith('.m3u')
+  );
+}
+
+/**
+ * Upstream `content-length` describes the *encoded* body. `fetch` transparently
+ * decompresses, so forwarding the original length truncates the response in the
+ * browser. Drop both headers whenever the upstream applied a content coding.
+ */
+export function shouldForwardContentLength(contentEncoding: string | null): boolean {
+  if (!contentEncoding) return true;
+  return contentEncoding.trim().toLowerCase() === 'identity';
+}
+
+const RANGE_PATTERN = /^bytes=\d*-\d*(,\s*\d*-\d*)*$/;
+
+export function sanitizeRangeHeader(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.length > 128 || !RANGE_PATTERN.test(trimmed)) return null;
+  return trimmed;
 }

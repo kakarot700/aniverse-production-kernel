@@ -26,5 +26,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|webm)$).*)'],
+  // API routes are session-free, and `/api/proxy` serves every HLS segment —
+  // running a Supabase token refresh on those requests added a network
+  // round-trip to each segment fetch.
+  matcher: [
+    '/((?!api/|_next/static|_next/image|favicon.ico|posters/|previews/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|webm|ico)$).*)',
+  ],
 };

@@ -1,0 +1,57 @@
+[
+  {
+    "id": "example-primary-sub",
+    "name": "Primary CDN",
+    "group": "Licensed",
+    "language": "sub",
+    "kind": "hls",
+    "priority": 10,
+    "requiresProxy": true,
+    "scope": "universal",
+    "quality": "1080p",
+    "note": "Replace with an origin you own or are licensed to stream from.",
+    "template": "https://media.example.com/anime/{slug}/e{episode3}/master.m3u8",
+    "enabled": false
+  },
+  {
+    "id": "example-backup-sub",
+    "name": "Backup CDN",
+    "group": "Licensed",
+    "language": "sub",
+    "kind": "hls",
+    "priority": 20,
+    "requiresProxy": true,
+    "scope": "universal",
+    "quality": "720p",
+    "template": "https://backup.example.com/{anilistId}/{episode}/index.m3u8",
+    "enabled": false
+  },
+  {
+    "id": "example-dub-mapped",
+    "name": "Partner CDN (dub)",
+    "group": "Licensed",
+    "language": "dub",
+    "kind": "hls",
+    "priority": 30,
+    "requiresProxy": false,
+    "scope": "mapped",
+    "note": "Only resolves for the titles listed below.",
+    "titles": {
+      "anilist:21": "https://dub.example.com/one-piece/{episode3}/index.m3u8",
+      "anilist:16498": "https://dub.example.com/attack-on-titan/s1/{episode2}/index.m3u8"
+    },
+    "enabled": false
+  },
+  {
+    "id": "example-self-hosted-mp4",
+    "name": "Self-hosted archive",
+    "group": "Self-hosted",
+    "language": "raw",
+    "kind": "mp4",
+    "priority": 40,
+    "requiresProxy": true,
+    "scope": "universal",
+    "template": "https://files.example.com/library/{slug}/{episode3}.mp4",
+    "enabled": false
+  }
+]

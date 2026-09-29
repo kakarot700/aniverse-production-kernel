@@ -1,18 +1,21 @@
 'use client';
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createBrowserSupabaseClient } from '@/lib/supabase/browser';
 import { estimatePeerClockOffset, planPlaybackCorrection, predictPlayheadSeconds } from '@/lib/watch-sync';
 import type { PlaybackSnapshot } from '@/types/media';
 
 const ROOM_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HEARTBEAT_MS = 4_000;
+const MIN_PUBLISH_GAP_MS = 180;
+const REMOTE_APPLY_WINDOW_MS = 120;
 
 type ConnectionState = 'idle' | 'connecting' | 'connected' | 'unavailable' | 'error';
 interface PeerClock { offsetMs: number; rttMs: number }
 interface ClockPing { peerId: string; pingId: string; sentAt: number }
 interface ClockPong { peerId: string; targetPeerId: string; pingId: string; peerReceivedAt: number; peerSentAt: number }
-interface WatchRoomState { state: ConnectionState; error: string; driftMs: number | null; roundTripMs: number | null }
+interface WatchRoomState { state: ConnectionState; error: string; driftMs: number | null; roundTripMs: number | null; peers: number }
 
 function isPlaybackSnapshot(value: unknown): value is PlaybackSnapshot {
   if (!value || typeof value !== 'object') return false;
@@ -42,20 +45,34 @@ function isClockPong(value: unknown): value is ClockPong {
     && Number.isFinite(pong.peerSentAt);
 }
 
-export function useWatchRoom(videoRef: RefObject<HTMLVideoElement | null>, roomId: string) {
-  const [roomState, setRoomState] = useState<WatchRoomState>({ state: 'idle', error: '', driftMs: null, roundTripMs: null });
+const IDLE_STATE: WatchRoomState = { state: 'idle', error: '', driftMs: null, roundTripMs: null, peers: 0 };
+
+/**
+ * Joins a private Supabase Broadcast room and keeps the supplied video element
+ * aligned with its peers.
+ *
+ * Takes the resolved element rather than a ref so listeners re-bind when the
+ * player swaps its `<video>`; a ref captured once goes stale and silently stops
+ * publishing.
+ */
+export function useWatchRoom(video: HTMLVideoElement | null, roomId: string) {
+  const [roomState, setRoomState] = useState<WatchRoomState>(IDLE_STATE);
   const peerIdRef = useRef('');
   const sequenceRef = useRef(0);
-  const applyingRemoteRef = useRef(false);
+  const suppressUntilRef = useRef(0);
 
   useEffect(() => {
     if (!ROOM_ID_PATTERN.test(roomId)) {
-      setRoomState({ state: 'idle', error: '', driftMs: null, roundTripMs: null });
+      setRoomState(IDLE_STATE);
       return;
     }
     const supabase = createBrowserSupabaseClient();
     if (!supabase) {
-      setRoomState({ state: 'unavailable', error: 'Add Supabase URL and publishable key to connect watch rooms.', driftMs: null, roundTripMs: null });
+      setRoomState({
+        ...IDLE_STATE,
+        state: 'unavailable',
+        error: 'Add the Supabase URL and publishable key to connect watch rooms.',
+      });
       return;
     }
 
@@ -63,10 +80,14 @@ export function useWatchRoom(videoRef: RefObject<HTMLVideoElement | null>, roomI
     const clockByPeer = new Map<string, PeerClock>();
     const samplesByPeer = new Map<string, Array<{ offsetMs: number; rttMs: number }>>();
     const lastSequenceByPeer = new Map<string, number>();
+    const lastSeenByPeer = new Map<string, number>();
     const pendingPings = new Map<string, number>();
+    const pingTimeouts = new Set<number>();
+
     let subscribed = false;
     let lastSentAt = 0;
     let resetRateTimer: number | null = null;
+
     const channel: RealtimeChannel = supabase.channel(`aniverse:watch-room:${roomId}`, {
       config: { private: true, broadcast: { ack: false, self: false } },
     });
@@ -78,17 +99,30 @@ export function useWatchRoom(videoRef: RefObject<HTMLVideoElement | null>, roomI
       });
     };
 
+    const notePeer = (remotePeerId: string) => {
+      lastSeenByPeer.set(remotePeerId, Date.now());
+      const active = [...lastSeenByPeer.values()].filter((seen) => Date.now() - seen < 20_000).length;
+      setRoomState((current) => (current.peers === active ? current : { ...current, peers: active }));
+    };
+
     const sendClockPing = () => {
+      if (!subscribed) return;
       const sentAt = Date.now();
       const pingId = crypto.randomUUID();
       pendingPings.set(pingId, sentAt);
       send('clock-ping', { peerId, pingId, sentAt });
-      window.setTimeout(() => pendingPings.delete(pingId), 12_000);
+      const timeout = window.setTimeout(() => {
+        pendingPings.delete(pingId);
+        pingTimeouts.delete(timeout);
+      }, 12_000);
+      pingTimeouts.add(timeout);
     };
 
-    const publishPlayback = (video: HTMLVideoElement) => {
+    const publishPlayback = (force = false) => {
+      if (!video || !subscribed) return;
       const now = Date.now();
-      if (!subscribed || applyingRemoteRef.current || now - lastSentAt < 180) return;
+      if (now < suppressUntilRef.current) return;
+      if (!force && now - lastSentAt < MIN_PUBLISH_GAP_MS) return;
       lastSentAt = now;
       sequenceRef.current += 1;
       const snapshot: PlaybackSnapshot = {
@@ -103,21 +137,37 @@ export function useWatchRoom(videoRef: RefObject<HTMLVideoElement | null>, roomI
 
     const onPing = (payload: unknown) => {
       if (!isClockPing(payload) || payload.peerId === peerId) return;
-      const peerReceivedAt = Date.now();
-      const peerSentAt = Date.now();
-      send('clock-pong', { peerId, targetPeerId: payload.peerId, pingId: payload.pingId, peerReceivedAt, peerSentAt });
+      notePeer(payload.peerId);
+      const at = Date.now();
+      send('clock-pong', {
+        peerId,
+        targetPeerId: payload.peerId,
+        pingId: payload.pingId,
+        peerReceivedAt: at,
+        peerSentAt: Date.now(),
+      });
     };
 
     const onPong = (payload: unknown) => {
       if (!isClockPong(payload) || payload.targetPeerId !== peerId) return;
+      notePeer(payload.peerId);
       const localSentAt = pendingPings.get(payload.pingId);
       if (localSentAt === undefined) return;
       pendingPings.delete(payload.pingId);
-      const sample = estimatePeerClockOffset({ localSentAt, peerReceivedAt: payload.peerReceivedAt, peerSentAt: payload.peerSentAt, localReceivedAt: Date.now() });
-      const samples = samplesByPeer.get(payload.peerId) ?? [];
-      samples.push(sample);
-      samplesByPeer.set(payload.peerId, samples.slice(-7));
-      const bestSamples = [...samples].sort((left, right) => left.rttMs - right.rttMs).slice(0, 3).sort((left, right) => left.offsetMs - right.offsetMs);
+
+      const sample = estimatePeerClockOffset({
+        localSentAt,
+        peerReceivedAt: payload.peerReceivedAt,
+        peerSentAt: payload.peerSentAt,
+        localReceivedAt: Date.now(),
+      });
+      const samples = [...(samplesByPeer.get(payload.peerId) ?? []), sample].slice(-7);
+      samplesByPeer.set(payload.peerId, samples);
+      // Median offset of the three lowest-RTT samples resists jitter spikes.
+      const bestSamples = [...samples]
+        .sort((left, right) => left.rttMs - right.rttMs)
+        .slice(0, 3)
+        .sort((left, right) => left.offsetMs - right.offsetMs);
       const selected = bestSamples[Math.floor(bestSamples.length / 2)] ?? sample;
       clockByPeer.set(payload.peerId, selected);
       setRoomState((current) => ({ ...current, roundTripMs: Math.round(selected.rttMs) }));
@@ -125,17 +175,20 @@ export function useWatchRoom(videoRef: RefObject<HTMLVideoElement | null>, roomI
 
     const onPlayback = (payload: unknown) => {
       if (!isPlaybackSnapshot(payload) || payload.peerId === peerId) return;
+      notePeer(payload.peerId);
       const lastSequence = lastSequenceByPeer.get(payload.peerId) ?? -1;
       if (payload.sequence <= lastSequence) return;
       lastSequenceByPeer.set(payload.peerId, payload.sequence);
-
-      const video = videoRef.current;
       if (!video) return;
+
       const peerClock = clockByPeer.get(payload.peerId) ?? { offsetMs: 0, rttMs: 0 };
       const targetSeconds = predictPlayheadSeconds(payload, Date.now(), peerClock.offsetMs);
       const correction = planPlaybackCorrection(video.currentTime, targetSeconds, payload.playing, 10);
       setRoomState((current) => ({ ...current, driftMs: Math.round(correction.driftMs) }));
-      applyingRemoteRef.current = true;
+
+      // Suppress our own publisher while the remote state is being applied so
+      // two clients cannot echo each other into a correction loop.
+      suppressUntilRef.current = Date.now() + REMOTE_APPLY_WINDOW_MS;
 
       if (correction.kind === 'seek') {
         const ceiling = Number.isFinite(video.duration) ? Math.max(0, video.duration - 0.03) : correction.targetSeconds;
@@ -144,20 +197,22 @@ export function useWatchRoom(videoRef: RefObject<HTMLVideoElement | null>, roomI
         video.playbackRate = correction.playbackRate;
         if (resetRateTimer !== null) window.clearTimeout(resetRateTimer);
         resetRateTimer = window.setTimeout(() => {
-          if (videoRef.current) videoRef.current.playbackRate = 1;
+          if (video) video.playbackRate = 1;
         }, 1500);
-      } else if (correction.kind === 'none') {
+      } else if (correction.kind === 'none' && video.playbackRate !== 1) {
         video.playbackRate = 1;
       }
 
       if (payload.playing && video.paused) {
         void video.play().catch(() => {
-          setRoomState((current) => ({ ...current, error: 'Browser autoplay is blocked; press play to follow the room.' }));
+          setRoomState((current) => ({
+            ...current,
+            error: 'Browser autoplay is blocked; press play once to follow the room.',
+          }));
         });
       } else if (!payload.playing && !video.paused) {
         video.pause();
       }
-      window.setTimeout(() => { applyingRemoteRef.current = false; }, 90);
     };
 
     channel
@@ -167,11 +222,16 @@ export function useWatchRoom(videoRef: RefObject<HTMLVideoElement | null>, roomI
       .subscribe((status, error) => {
         if (status === 'SUBSCRIBED') {
           subscribed = true;
-          setRoomState({ state: 'connected', error: '', driftMs: null, roundTripMs: null });
+          setRoomState({ state: 'connected', error: '', driftMs: null, roundTripMs: null, peers: 0 });
           sendClockPing();
+          publishPlayback(true);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           subscribed = false;
-          setRoomState((current) => ({ ...current, state: 'error', error: error?.message || 'Realtime room connection failed.' }));
+          setRoomState((current) => ({
+            ...current,
+            state: 'error',
+            error: error?.message || 'Realtime room connection failed.',
+          }));
         } else if (status === 'CLOSED') {
           subscribed = false;
           setRoomState((current) => ({ ...current, state: 'idle' }));
@@ -180,30 +240,34 @@ export function useWatchRoom(videoRef: RefObject<HTMLVideoElement | null>, roomI
         }
       });
 
-    const pingTimer = window.setInterval(sendClockPing, 2500);
-    const video = videoRef.current;
-    const publishOnPlaybackEvent = () => {
-      if (video) publishPlayback(video);
-    };
-    const publishOnTimeUpdate = () => {
-      if (video) publishPlayback(video);
-    };
-    video?.addEventListener('play', publishOnPlaybackEvent);
-    video?.addEventListener('pause', publishOnPlaybackEvent);
-    video?.addEventListener('seeked', publishOnPlaybackEvent);
-    video?.addEventListener('timeupdate', publishOnTimeUpdate);
+    const pingTimer = window.setInterval(sendClockPing, 2_500);
+    // A slow heartbeat keeps late joiners aligned without flooding the channel
+    // the way a per-`timeupdate` publish did.
+    const heartbeatTimer = window.setInterval(() => {
+      if (video && !video.paused) publishPlayback(true);
+    }, HEARTBEAT_MS);
+
+    const publishNow = () => publishPlayback(true);
+    const publishThrottled = () => publishPlayback(false);
+    video?.addEventListener('play', publishNow);
+    video?.addEventListener('pause', publishNow);
+    video?.addEventListener('seeked', publishNow);
+    video?.addEventListener('ratechange', publishThrottled);
 
     return () => {
       window.clearInterval(pingTimer);
+      window.clearInterval(heartbeatTimer);
       if (resetRateTimer !== null) window.clearTimeout(resetRateTimer);
-      video?.removeEventListener('play', publishOnPlaybackEvent);
-      video?.removeEventListener('pause', publishOnPlaybackEvent);
-      video?.removeEventListener('seeked', publishOnPlaybackEvent);
-      video?.removeEventListener('timeupdate', publishOnTimeUpdate);
+      for (const timeout of pingTimeouts) window.clearTimeout(timeout);
+      pingTimeouts.clear();
+      video?.removeEventListener('play', publishNow);
+      video?.removeEventListener('pause', publishNow);
+      video?.removeEventListener('seeked', publishNow);
+      video?.removeEventListener('ratechange', publishThrottled);
       subscribed = false;
       void supabase.removeChannel(channel);
     };
-  }, [roomId, videoRef]);
+  }, [roomId, video]);
 
   return roomState;
 }
