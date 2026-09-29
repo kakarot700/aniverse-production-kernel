@@ -60,7 +60,7 @@ drop policy if exists watchlists_delete_own on public.watchlists;
 create policy watchlists_delete_own on public.watchlists for delete to authenticated
   using ((select auth.uid()) = user_id);
 
- drop policy if exists playback_history_select_own on public.playback_history;
+drop policy if exists playback_history_select_own on public.playback_history;
 create policy playback_history_select_own on public.playback_history for select to authenticated
   using ((select auth.uid()) = user_id);
 drop policy if exists playback_history_insert_own on public.playback_history;

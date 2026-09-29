@@ -17,7 +17,12 @@ interface JikanAnime {
   mal_id: number;
   url?: string | null;
   images?: { jpg?: { large_image_url?: string | null; image_url?: string | null } } | null;
-  trailer?: { youtube_id?: string | null; url?: string | null; images?: { maximum_image_url?: string | null } } | null;
+  trailer?: {
+    youtube_id?: string | null;
+    url?: string | null;
+    embed_url?: string | null;
+    images?: { maximum_image_url?: string | null };
+  } | null;
   title?: string | null;
   title_english?: string | null;
   title_japanese?: string | null;
@@ -30,6 +35,7 @@ interface JikanAnime {
   synopsis?: string | null;
   season?: string | null;
   year?: number | null;
+  aired?: { prop?: { from?: { year?: number | null } | null } | null } | null;
   genres?: Array<{ name: string }> | null;
   studios?: Array<{ name: string }> | null;
   rating?: string | null;
@@ -65,6 +71,33 @@ const FORMAT_FROM_JIKAN: Record<string, string> = {
   Music: 'MUSIC',
 };
 
+/**
+ * Jikan reports `"Finished Airing"`, `"Currently Airing"` or `"Not yet aired"`.
+ * A substring test for `airing` matches the *finished* case too, which
+ * labelled every completed series as still releasing.
+ */
+function mapJikanStatus(status: string | null | undefined): string {
+  const value = (status ?? '').trim().toLowerCase();
+  if (value.startsWith('currently')) return 'RELEASING';
+  if (value.startsWith('not yet')) return 'NOT_YET_RELEASED';
+  if (value.startsWith('finished')) return 'FINISHED';
+  return 'FINISHED';
+}
+
+/**
+ * Jikan frequently leaves `trailer.youtube_id` null while still returning the
+ * id inside `embed_url`, so read the id back out of whichever field has it.
+ */
+function jikanYoutubeId(trailer: JikanAnime['trailer']): string | null {
+  const direct = trailer?.youtube_id?.trim();
+  if (direct) return direct;
+  for (const candidate of [trailer?.url, trailer?.embed_url]) {
+    const match = candidate?.match(/(?:embed\/|[?&]v=)([A-Za-z0-9_-]{6,20})/);
+    if (match?.[1]) return match[1];
+  }
+  return null;
+}
+
 function parseDurationMinutes(duration: string | null | undefined): number | null {
   if (!duration) return null;
   const hours = Number.parseInt(duration.match(/(\d+)\s*hr/i)?.[1] ?? '', 10);
@@ -75,7 +108,7 @@ function parseDurationMinutes(duration: string | null | undefined): number | nul
 
 export function mapJikanAnime(anime: JikanAnime): AnimeSummary {
   const title = anime.title_english?.trim() || anime.title?.trim() || `MAL #${anime.mal_id}`;
-  const youtubeId = anime.trailer?.youtube_id?.trim() || null;
+  const youtubeId = jikanYoutubeId(anime.trailer);
   return {
     id: `mal:${anime.mal_id}`,
     anilistId: null,
@@ -92,10 +125,11 @@ export function mapJikanAnime(anime: JikanAnime): AnimeSummary {
     bannerImage: null,
     accentColor: null,
     genres: (anime.genres ?? []).map((genre) => genre.name).filter(Boolean),
-    year: anime.year ?? null,
+    // Movies and specials carry no `year`/`season`, only an air date.
+    year: anime.year ?? anime.aired?.prop?.from?.year ?? null,
     season: anime.season ? anime.season.toUpperCase() : null,
     format: FORMAT_FROM_JIKAN[anime.type ?? ''] ?? 'TV',
-    status: (anime.status ?? '').toLowerCase().includes('airing') ? 'RELEASING' : 'FINISHED',
+    status: mapJikanStatus(anime.status),
     episodeCount: anime.episodes ?? null,
     durationMinutes: parseDurationMinutes(anime.duration),
     averageScore: anime.score != null ? Math.round(anime.score * 10) : null,

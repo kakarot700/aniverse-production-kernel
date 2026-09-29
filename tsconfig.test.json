@@ -26,6 +26,8 @@
     "lib/anime/cache.ts",
     "lib/anime/offline.ts",
     "types/anime.ts",
-    "types/media.ts"
+    "types/media.ts",
+    "lib/anime/jikan.ts",
+    "tests/jikan-live-shape.test.ts"
   ]
 }

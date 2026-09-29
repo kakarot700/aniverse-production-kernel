@@ -67,6 +67,30 @@ The same applies to title details: `useAnimeDetail` falls back to
 `slug`, `title`, `year`, `season`, `malId` and `episodes` hints so stream
 servers still resolve while server-side metadata is unavailable.
 
+## Testing against real responses
+
+`tests/fixtures/jikan-real-response.json` is a response **recorded from the
+live Jikan v4 API** (2026-09-29), and `tests/jikan-live-shape.test.ts` runs the
+real mapper over it.
+
+This exists because hand-written stubs only prove that a mapper agrees with the
+test author's guess at the API. Recording the real payload immediately exposed
+three defects that the stub-based tests had passed over:
+
+| Real field | What actually comes back | Defect it caused |
+| --- | --- | --- |
+| `status` | `"Finished Airing"` | a substring test for `airing` matched the finished case, so every completed series was labelled *releasing* |
+| `trailer.youtube_id` | `null`, with the id only inside `trailer.embed_url` | no title ever produced a trailer |
+| `year` / `season` | both `null` on movies; the date lives at `aired.prop.from.year` | films showed no year |
+
+If Jikan changes shape, **re-record the fixture** rather than relaxing the
+assertions - the point of the file is that it is not invented.
+
+AniList has no equivalent fixture yet: its endpoint is POST-only and the
+sandbox this was built in had no egress to it. The AniList mapper is therefore
+still covered only by hand-written cases, and is the most likely place for a
+similar shape mismatch to be hiding. Recording one is the obvious next step.
+
 ## Attribution and terms
 
 AniList and Jikan/MyAnimeList data is used under their public API terms.
