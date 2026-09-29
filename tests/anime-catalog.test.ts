@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseCatalogQuery, catalogCacheKey, CATALOG_SORTS } from '../lib/anime/query';
+import { parseCatalogQuery, catalogCacheKey, CATALOG_SORTS, SEASONS } from '../lib/anime/query';
 import { formatLine, humanizeFormat, humanizeSeason, toPlainText } from '../lib/anime/text';
 import { offlineBrowse, offlineDetail, offlineGenres, offlineAll } from '../lib/anime/offline';
 import { TtlCache } from '../lib/anime/cache';
@@ -158,4 +158,26 @@ test('TTL cache expires entries and evicts the oldest past its cap', () => {
   assert.equal(cache.size, 2, 'cache is bounded');
   assert.equal(cache.get('x', 10), undefined, 'oldest entry was evicted');
   assert.equal(cache.get('z', 10), 'Z');
+});
+
+test('catalog query accepts every season and pairs with a year', () => {
+  for (const season of SEASONS) {
+    const query = parseCatalogQuery(new URLSearchParams(`season=${season.toLowerCase()}&year=2019`));
+    assert.equal(query.season, season, 'season is normalised to upper case');
+    assert.equal(query.year, 2019);
+  }
+  assert.equal(parseCatalogQuery(new URLSearchParams('season=monsoon')).season, '');
+});
+
+test('offline browse ignores season rather than returning an empty grid', () => {
+  // The seed has release years but no airing season. Silently returning zero
+  // results would be indistinguishable from a broken filter.
+  const withSeason = offlineBrowse(parseCatalogQuery(new URLSearchParams('season=SPRING&perPage=5')));
+  assert.ok(withSeason.items.length > 0);
+});
+
+test('offline year filter is exact', () => {
+  const page = offlineBrowse(parseCatalogQuery(new URLSearchParams('year=1998&perPage=50')));
+  assert.ok(page.items.length > 0);
+  assert.ok(page.items.every((item) => item.year === 1998));
 });

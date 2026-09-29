@@ -3,7 +3,7 @@ import { getCatalogRecord } from '@/lib/anime';
 import { getServerRuntimeConfig, getSourceMapConfig } from '@/lib/servers/config';
 import { getEffectiveAllowedHosts } from '@/lib/servers/allowlist';
 import { isReferenceStreamsEnabled } from '@/lib/servers/reference-streams';
-import { loadSourceMap } from '@/lib/servers/source-map';
+import { loadSourceMap, lookupSkipTimestamps } from '@/lib/servers/source-map';
 import { resolveEpisodeMirrors } from '@/lib/servers/resolve';
 
 export const runtime = 'nodejs';
@@ -37,16 +37,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   const episodeNumber = available.includes(requested) ? requested : (available[0] ?? 1);
 
   const sourceMapConfig = getSourceMapConfig();
+  const sourceMap = await loadSourceMap(sourceMapConfig);
   const mirrors = resolveEpisodeMirrors(record.id, episodeNumber, {
     servers: getServerRuntimeConfig(),
-    sourceMap: await loadSourceMap(sourceMapConfig),
+    sourceMap,
     allowedHosts: getEffectiveAllowedHosts(),
     referenceStreamsEnabled: isReferenceStreamsEnabled(),
   });
+  const skipTimestamps = lookupSkipTimestamps(sourceMap, record.id, episodeNumber);
 
   // Attach to the matching episode so the client has one consistent shape.
   const episodes = record.episodes.map((episode) =>
-    episode.episodeNumber === episodeNumber ? { ...episode, mirrors } : episode,
+    episode.episodeNumber === episodeNumber ? { ...episode, mirrors, skipTimestamps } : episode,
   );
 
   return NextResponse.json(

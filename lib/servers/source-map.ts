@@ -27,6 +27,14 @@
  * ignored rather than failing the whole map.
  */
 
+/** Intro/outro markers, in seconds from the start of the episode. */
+export interface SourceMapSkip {
+  introStart: number;
+  introEnd: number;
+  outroStart: number;
+  outroEnd: number;
+}
+
 export interface SourceMapEntry {
   server: string;
   /** Provider-side file identifier, substituted into the server template. */
@@ -35,6 +43,8 @@ export interface SourceMapEntry {
   url?: string;
   quality?: string;
   audio?: 'sub' | 'dub' | 'raw';
+  /** Optional intro/outro markers for this episode. */
+  skip?: SourceMapSkip;
 }
 
 export interface SourceMap {
@@ -47,6 +57,26 @@ const EMPTY: SourceMap = { version: 1, entries: {} };
 
 function isAudio(value: unknown): value is SourceMapEntry['audio'] {
   return value === 'sub' || value === 'dub' || value === 'raw';
+}
+
+function sanitizeSkip(value: unknown): SourceMapSkip | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  const read = (key: string): number | null => {
+    const candidate = raw[key];
+    return typeof candidate === 'number' && Number.isFinite(candidate) && candidate >= 0 && candidate < 86_400
+      ? candidate
+      : null;
+  };
+
+  const introStart = read('introStart');
+  const introEnd = read('introEnd');
+  const outroStart = read('outroStart');
+  const outroEnd = read('outroEnd');
+  if (introStart === null || introEnd === null || outroStart === null || outroEnd === null) return null;
+  // A reversed or zero-length window would make the skip button flicker.
+  if (introEnd <= introStart || outroEnd <= outroStart) return null;
+  return { introStart, introEnd, outroStart, outroEnd };
 }
 
 function sanitizeEntry(value: unknown): SourceMapEntry | null {
@@ -78,6 +108,8 @@ function sanitizeEntry(value: unknown): SourceMapEntry | null {
   if (!entry.url && !entry.fileId) return null;
   if (typeof raw.quality === 'string' && raw.quality.trim().length <= 16) entry.quality = raw.quality.trim();
   if (isAudio(raw.audio)) entry.audio = raw.audio;
+  const skip = sanitizeSkip(raw.skip);
+  if (skip) entry.skip = skip;
 
   return entry;
 }
@@ -108,6 +140,15 @@ export function sanitizeSourceMap(value: unknown): SourceMap {
 
 export function lookupSourceMap(map: SourceMap, mediaId: string, episodeNumber: number): SourceMapEntry[] {
   return map.entries[mediaId]?.[String(episodeNumber)] ?? [];
+}
+
+/** First skip window declared for an episode, if any server supplied one. */
+export function lookupSkipTimestamps(
+  map: SourceMap,
+  mediaId: string,
+  episodeNumber: number,
+): SourceMapSkip | undefined {
+  return lookupSourceMap(map, mediaId, episodeNumber).find((entry) => entry.skip)?.skip;
 }
 
 // ── Runtime loading (server-side only) ──────────────────────────────────────

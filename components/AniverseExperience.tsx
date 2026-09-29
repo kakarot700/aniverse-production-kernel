@@ -1,8 +1,14 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AccountPanel } from '@/components/AccountPanel';
 import { CatalogCard } from '@/components/CatalogCard';
+import { CatalogShelf } from '@/components/CatalogShelf';
+import { useCatalog, useDebounced, type CatalogFilters } from '@/hooks/useCatalog';
+import { useSupabaseUser } from '@/hooks/useSupabaseUser';
+import { useUserLibrary } from '@/hooks/useUserLibrary';
+import type { CatalogPage, MediaCatalogRecord } from '@/types/media';
 
 /**
  * The player dialog pulls in hls.js (~130 kB) and the whole watch-room stack.
@@ -12,15 +18,13 @@ import { CatalogCard } from '@/components/CatalogCard';
 const TitleDialog = dynamic(() => import('@/components/TitleDialog').then((mod) => mod.TitleDialog), {
   ssr: false,
 });
-import { useCatalog, useDebounced, type CatalogFilters } from '@/hooks/useCatalog';
-import type { CatalogPage, MediaCatalogRecord } from '@/types/media';
 
 interface AniverseExperienceProps {
   initial: CatalogPage;
   genres: string[];
 }
 
-const ROOM_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CATALOG_ID_PATTERN = /^(anilist|mal|offline):[A-Za-z0-9._-]{1,80}$/;
 
 const SORT_OPTIONS = [
   { value: 'trending', label: 'Trending' },
@@ -39,45 +43,119 @@ const FORMAT_OPTIONS = [
   { value: 'SPECIAL', label: 'Special' },
 ] as const;
 
+const SEASON_OPTIONS = [
+  { value: '', label: 'Any season' },
+  { value: 'WINTER', label: 'Winter' },
+  { value: 'SPRING', label: 'Spring' },
+  { value: 'SUMMER', label: 'Summer' },
+  { value: 'FALL', label: 'Fall' },
+] as const;
+
 const SOURCE_LABEL: Record<string, string> = {
   anilist: 'AniList',
   jikan: 'MyAnimeList (Jikan)',
   offline: 'bundled offline catalog',
 };
 
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 46 }, (_unused, index) => CURRENT_YEAR + 1 - index);
+
+interface OpenTitle {
+  id: string;
+  preview: MediaCatalogRecord | null;
+  episode: number;
+}
+
+/** Reads `?title=` / `?ep=` so an invite link resolves to a specific title. */
+function readTitleFromUrl(): { id: string; episode: number } | null {
+  if (typeof window === 'undefined') return null;
+  const params = new URL(window.location.href).searchParams;
+  const id = params.get('title') ?? '';
+  if (!CATALOG_ID_PATTERN.test(id)) return null;
+  const episode = Number.parseInt(params.get('ep') ?? '1', 10);
+  return { id, episode: Number.isSafeInteger(episode) && episode > 0 ? episode : 1 };
+}
+
+function writeTitleToUrl(id: string | null, episode: number): void {
+  const url = new URL(window.location.href);
+  if (id) {
+    url.searchParams.set('title', id);
+    url.searchParams.set('ep', String(episode));
+  } else {
+    url.searchParams.delete('title');
+    url.searchParams.delete('ep');
+  }
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
 export function AniverseExperience({ initial, genres }: AniverseExperienceProps) {
   const [searchInput, setSearchInput] = useState('');
   const [genre, setGenre] = useState('All');
   const [sort, setSort] = useState<string>('trending');
   const [format, setFormat] = useState('');
-  const [selected, setSelected] = useState<MediaCatalogRecord | null>(null);
+  const [season, setSeason] = useState('');
+  const [year, setYear] = useState('');
+  const [open, setOpen] = useState<OpenTitle | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const account = useSupabaseUser();
+  const library = useUserLibrary(account);
+  const signedIn = Boolean(account.user);
 
   const search = useDebounced(searchInput, 350);
 
   const filters = useMemo<CatalogFilters>(
-    () => ({ search, genre, sort, year: null, format }),
-    [search, genre, sort, format],
+    () => ({
+      search,
+      genre,
+      sort,
+      year: year ? Number.parseInt(year, 10) : null,
+      format,
+      season,
+    }),
+    [search, genre, sort, format, season, year],
   );
 
-  // Only reuse the server-rendered page while the user is on the default view.
-  const isDefaultView = search === '' && genre === 'All' && sort === 'trending' && format === '';
+  const isDefaultView =
+    search === '' && genre === 'All' && sort === 'trending' && format === '' && season === '' && year === '';
   const catalog = useCatalog(filters, isDefaultView ? initial : undefined);
 
   const featured = catalog.items[0];
   const genreChips = useMemo(() => ['All', ...genres], [genres]);
 
-  // Deep link: /?room=<uuid> opens the featured title so both peers land in
-  // the same player.
-  const roomHandledRef = useRef(false);
+  const openTitle = useCallback((item: MediaCatalogRecord) => {
+    setOpen({ id: item.id, preview: item, episode: 1 });
+    writeTitleToUrl(item.id, 1);
+  }, []);
+
+  const closeTitle = useCallback(() => {
+    setOpen(null);
+    writeTitleToUrl(null, 1);
+  }, []);
+
+  const changeEpisode = useCallback((episodeNumber: number) => {
+    setOpen((current) => {
+      if (!current) return current;
+      writeTitleToUrl(current.id, episodeNumber);
+      return { ...current, episode: episodeNumber };
+    });
+  }, []);
+
+  /**
+   * Restore a title from the URL on load.
+   *
+   * This also fixes the watch-room invite flow: the previous build opened
+   * whatever happened to be first in the trending list, so two peers sharing a
+   * `?room=` link could easily land on different titles — or the same peer
+   * could get a different one an hour later.
+   */
+  const restoredRef = useRef(false);
   useEffect(() => {
-    if (roomHandledRef.current || !featured) return;
-    const roomId = new URL(window.location.href).searchParams.get('room') ?? '';
-    if (ROOM_ID_PATTERN.test(roomId)) {
-      roomHandledRef.current = true;
-      setSelected(featured);
-    }
-  }, [featured]);
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    const fromUrl = readTitleFromUrl();
+    if (fromUrl) setOpen({ id: fromUrl.id, preview: null, episode: fromUrl.episode });
+  }, []);
 
   // Infinite scroll. Depends on the two values that actually matter, not on
   // the whole catalog object, which is a fresh reference on every render and
@@ -96,9 +174,31 @@ export function AniverseExperience({ initial, genres }: AniverseExperienceProps)
     return () => observer.disconnect();
   }, [hasNextPage, loadMore]);
 
-  const openWatchRoom = () => {
-    if (featured) setSelected(featured);
-  };
+  // Most recent episode per title, newest first.
+  const continueIds = useMemo(() => {
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const entry of library.history) {
+      if (seen.has(entry.mediaId)) continue;
+      seen.add(entry.mediaId);
+      ids.push(entry.mediaId);
+      if (ids.length >= 12) break;
+    }
+    return ids;
+  }, [library.history]);
+
+  const watchlistIds = useMemo(() => [...library.watchlist].slice(0, 24), [library.watchlist]);
+
+  const continueFootnote = useCallback(
+    (item: MediaCatalogRecord) => {
+      const entry = library.history.find((candidate) => candidate.mediaId === item.id);
+      if (!entry) return null;
+      const minutes = Math.floor(entry.positionMs / 60_000);
+      const seconds = Math.floor((entry.positionMs % 60_000) / 1000);
+      return `Episode ${entry.episodeNumber} · ${minutes}:${String(seconds).padStart(2, '0')}`;
+    },
+    [library.history],
+  );
 
   return (
     <div className="site-shell">
@@ -117,13 +217,16 @@ export function AniverseExperience({ initial, genres }: AniverseExperienceProps)
         <nav className="header-nav" aria-label="Main navigation">
           <a href="#collection">Discover</a>
           <a href="#about">About</a>
-          <button type="button" onClick={openWatchRoom}>
+          <button type="button" onClick={() => featured && openTitle(featured)}>
             Watch together
           </button>
         </nav>
-        <span className="header-note">
-          {catalog.total > 0 ? `${catalog.total.toLocaleString()} titles` : 'Every anime, one shelf'}
-        </span>
+        <div className="header-side">
+          <span className="header-note">
+            {catalog.total > 0 ? `${catalog.total.toLocaleString()} titles` : 'Every anime, one shelf'}
+          </span>
+          <AccountPanel account={account} savedCount={library.watchlist.size} />
+        </div>
       </header>
 
       <main id="top">
@@ -143,15 +246,13 @@ export function AniverseExperience({ initial, genres }: AniverseExperienceProps)
             <button
               className="hero-art"
               type="button"
-              onClick={() => setSelected(featured)}
+              onClick={() => openTitle(featured)}
               aria-label={`Open featured title ${featured.title}`}
             >
               <img src={featured.bannerImage || featured.coverPoster} alt="" fetchPriority="high" />
               <span className="featured-seal">Trending now</span>
               <span className="hero-art-copy">
-                <span>
-                  Featured{featured.year ? ` · ${featured.year}` : ''}
-                </span>
+                <span>Featured{featured.year ? ` · ${featured.year}` : ''}</span>
                 <strong>{featured.title}</strong>
                 <small>
                   {featured.genres.slice(0, 3).join(' · ') || featured.genre} · {featured.format}
@@ -162,6 +263,20 @@ export function AniverseExperience({ initial, genres }: AniverseExperienceProps)
             <div className="hero-art hero-art-skeleton" aria-hidden="true" />
           )}
         </section>
+
+        {signedIn && continueIds.length > 0 ? (
+          <CatalogShelf
+            title="Continue watching"
+            caption="Picks up where you left off."
+            ids={continueIds}
+            onSelect={openTitle}
+            renderFootnote={continueFootnote}
+          />
+        ) : null}
+
+        {signedIn && watchlistIds.length > 0 ? (
+          <CatalogShelf title="Your list" caption="Saved for later." ids={watchlistIds} onSelect={openTitle} />
+        ) : null}
 
         <section id="collection" className="collection" aria-labelledby="collection-title">
           <div className="collection-head">
@@ -208,6 +323,43 @@ export function AniverseExperience({ initial, genres }: AniverseExperienceProps)
                 ))}
               </select>
             </label>
+            <label className="filter-field">
+              <span className="sr-only">Filter by season</span>
+              <select value={season} onChange={(event) => setSeason(event.target.value)}>
+                {SEASON_OPTIONS.map((option) => (
+                  <option key={option.value || 'any'} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
+              <span className="sr-only">Filter by year</span>
+              <select value={year} onChange={(event) => setYear(event.target.value)}>
+                <option value="">Any year</option>
+                {YEAR_OPTIONS.map((option) => (
+                  <option key={option} value={String(option)}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {!isDefaultView ? (
+              <button
+                type="button"
+                className="filter-reset"
+                onClick={() => {
+                  setSearchInput('');
+                  setGenre('All');
+                  setSort('trending');
+                  setFormat('');
+                  setSeason('');
+                  setYear('');
+                }}
+              >
+                Clear filters
+              </button>
+            ) : null}
           </div>
 
           <div className="genre-row" role="group" aria-label="Filter by genre">
@@ -249,7 +401,7 @@ export function AniverseExperience({ initial, genres }: AniverseExperienceProps)
             <>
               <div className="catalog-grid">
                 {catalog.items.map((item, index) => (
-                  <CatalogCard key={`${item.id}-${index}`} item={item} onSelect={setSelected} />
+                  <CatalogCard key={`${item.id}-${index}`} item={item} onSelect={openTitle} />
                 ))}
               </div>
               <div ref={sentinelRef} className="grid-sentinel" aria-hidden="true" />
@@ -292,7 +444,18 @@ export function AniverseExperience({ initial, genres }: AniverseExperienceProps)
         </div>
       </footer>
 
-      {selected ? <TitleDialog item={selected} onClose={() => setSelected(null)} /> : null}
+      {open ? (
+        <TitleDialog
+          key={open.id}
+          mediaId={open.id}
+          preview={open.preview}
+          initialEpisode={open.episode}
+          onEpisodeChange={changeEpisode}
+          onClose={closeTitle}
+          library={library}
+          signedIn={signedIn}
+        />
+      ) : null}
     </div>
   );
 }

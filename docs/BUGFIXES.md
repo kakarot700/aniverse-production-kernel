@@ -229,6 +229,69 @@ and never read it.
 
 **Fixed:** removed.
 
+## Second pass: completing the unfinished halves
+
+### 23. Watch-room invites could open different titles for each peer
+
+`?room=<uuid>` opened `items[0]` — whatever happened to be first in the
+*trending* list at that moment. Trending changes hourly and differs by
+provider, so two peers opening the same invite could land on different titles,
+and the same peer could get a different one an hour later. The room would
+connect and dutifully synchronise playheads across two unrelated videos.
+
+**Fixed:** the dialog is addressable by id. `?title=<catalog-id>&ep=<n>` is
+written on open and on every episode change, and restored on load, so an
+invite link resolves to exactly one title and episode.
+
+### 24. The entire Supabase user-data layer was unreachable
+
+`lib/supabase/repositories.ts` exported seven functions —
+`getOwnProfile`, `updateOwnProfile`, `listOwnWatchlist`, `addToOwnWatchlist`,
+`removeFromOwnWatchlist`, `recordOwnPlayback`, `listOwnPlaybackHistory` — with
+**zero callers** anywhere in the codebase. There was also no sign-in UI, so no
+authenticated client could ever exist. The `watchlists` and `playback_history`
+tables, and every RLS policy written for them, were dead weight.
+
+**Fixed:** passwordless email sign-in (`AccountPanel`), a watchlist toggle, a
+"Your list" shelf, playback-progress recording, resume-on-open, and a
+"Continue watching" shelf. See `docs/CATALOG.md`.
+
+### 25. `skipTimestamps` was declared but never populated — and auto-seeked
+
+`MediaEpisodePayload.skipTimestamps` existed in the types and `MasterPlayer`
+implemented handling for it, but nothing in the codebase ever set it, so the
+code was unreachable. Worse, when it *did* fire it silently moved the playhead:
+indistinguishable from a stream glitch, and impossible to decline.
+
+**Fixed:** the source map can supply per-episode intro/outro windows, validated
+so a reversed or partial block is dropped. The player now shows a **Skip
+intro** / **Skip outro** button instead of seeking on the viewer's behalf.
+
+### 26. Season filtering was parsed, supported, and unreachable
+
+`parseCatalogQuery` validated `season`, and both AniList and Jikan providers
+accepted it, but no UI control ever set it.
+
+**Fixed:** season and year selects, plus a "Clear filters" control. The offline
+provider documents that it ignores `season` — the seed has release years but
+no airing season, and returning an empty grid would look like a broken filter.
+
+### 27. No route-level error, loading, or 404 boundaries
+
+An exception in a server component produced Next's default error screen.
+
+**Fixed:** `app/error.tsx`, `app/loading.tsx`, and `app/not-found.tsx` in the
+app's own visual language.
+
+### 28. Shelf and progress hooks re-ran on every render
+
+`CatalogShelf` receives an array of ids, whose identity changes on every parent
+render; a naive effect dependency would refetch continuously. Progress writes
+had the same shape of problem.
+
+**Fixed:** the shelf keys its effect off a joined primitive, and progress
+writes are debounced and de-duplicated into a pending map.
+
 ## Known, not fixed
 
 - `npm audit` reports a high-severity advisory in `postcss`, reachable only as

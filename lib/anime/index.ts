@@ -92,6 +92,33 @@ export async function getCatalogRecord(id: string): Promise<{ record: MediaCatal
   return null;
 }
 
+/**
+ * Resolves several catalog ids at once, for shelves built from stored ids
+ * (watchlist, playback history). Episodes are stripped: these render as cards.
+ *
+ * Bounded to 24 ids and resolved with limited concurrency so one shelf cannot
+ * fan out into an unbounded burst of provider requests. Individual failures
+ * are dropped rather than failing the whole shelf.
+ */
+export async function getCatalogRecords(ids: readonly string[]): Promise<MediaCatalogRecord[]> {
+  const unique = [...new Set(ids)].slice(0, 24);
+  const found = new Map<string, MediaCatalogRecord>();
+  const CONCURRENCY = 4;
+
+  for (let offset = 0; offset < unique.length; offset += CONCURRENCY) {
+    const slice = unique.slice(offset, offset + CONCURRENCY);
+    const settled = await Promise.all(
+      slice.map((id) => getCatalogRecord(id).catch(() => null)),
+    );
+    settled.forEach((result, index) => {
+      if (result) found.set(slice[index], { ...result.record, episodes: [] });
+    });
+  }
+
+  // Preserve the caller's ordering (history is most-recent-first).
+  return unique.map((id) => found.get(id)).filter((record): record is MediaCatalogRecord => Boolean(record));
+}
+
 export async function listGenres(): Promise<{ genres: string[]; source: ProviderName }> {
   try {
     const genres = await anilistGenres();

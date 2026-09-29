@@ -9,6 +9,7 @@ export interface CatalogFilters {
   sort: string;
   year: number | null;
   format: string;
+  season: string;
 }
 
 export interface CatalogState {
@@ -30,6 +31,7 @@ function buildQuery(filters: CatalogFilters, page: number, perPage: number): str
   if (filters.genre && filters.genre !== 'All') params.set('genre', filters.genre);
   if (filters.year) params.set('year', String(filters.year));
   if (filters.format) params.set('format', filters.format);
+  if (filters.season) params.set('season', filters.season);
   return params.toString();
 }
 

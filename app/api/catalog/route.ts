@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { browseCatalog, parseCatalogQuery } from '@/lib/anime';
+import { browseCatalog, getCatalogRecords, parseCatalogQuery } from '@/lib/anime';
 
 export const runtime = 'nodejs';
 // Query-string driven and provider-backed, so never statically prerendered.
@@ -25,7 +25,27 @@ export const dynamic = 'force-dynamic';
  * need them, and resolving them per card would multiply source-map lookups.
  * `GET /api/catalog/<id>` returns the full mirror rail for one title.
  */
+const ID_PATTERN = /^(anilist|mal|offline):[A-Za-z0-9._-]{1,80}$/;
+
 export async function GET(request: NextRequest) {
+  // Batch mode: `?ids=anilist:1,offline:akira` resolves specific records for
+  // shelves built from stored ids, instead of running a browse query.
+  const rawIds = request.nextUrl.searchParams.get('ids');
+  if (rawIds) {
+    const ids = rawIds.split(',').map((id) => id.trim()).filter((id) => ID_PATTERN.test(id));
+    if (ids.length === 0) {
+      return NextResponse.json(
+        { items: [], page: 1, perPage: 0, hasNextPage: false, total: 0, source: 'offline' },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    const items = await getCatalogRecords(ids);
+    return NextResponse.json(
+      { items, page: 1, perPage: items.length, hasNextPage: false, total: items.length, source: items[0]?.source ?? 'offline' },
+      { headers: { 'Cache-Control': 'private, max-age=30' } },
+    );
+  }
+
   const query = parseCatalogQuery(request.nextUrl.searchParams);
 
   try {

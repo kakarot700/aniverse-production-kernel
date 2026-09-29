@@ -87,6 +87,14 @@ per request.
 
 Returns `{ record, episode, mirrors, sourceMapConfigured, degraded }`.
 
+### `GET /api/catalog?ids=…`
+
+Batch mode. Resolves specific records for shelves built from stored ids
+(watchlist, playback history) in one request instead of one per card. Ids are
+validated against the namespaced pattern, capped at 24, and resolved with a
+concurrency of 4; individual failures are dropped rather than failing the
+shelf. Episodes are stripped — these render as cards.
+
 ### `GET /api/genres`
 
 The genre vocabulary for the filter rail, from whichever provider answers.
@@ -113,3 +121,25 @@ The home page server-renders page 1 for the default view by calling
 HTTP, which would require an absolute origin and can deadlock a single-worker
 dev server. The client skips its first fetch when that server-rendered page is
 still the active view.
+
+## User library
+
+`hooks/useUserLibrary.ts` drives the watchlist and "Continue watching" shelves
+through the RLS-scoped helpers in `lib/supabase/repositories.ts`. Those helpers
+previously had **no callers at all** — the `watchlists` and `playback_history`
+tables and their policies were unreachable from the application.
+
+- **Watchlist** — optimistic toggle with rollback on failure.
+- **Playback progress** — written at most once per 5 s per media/episode pair,
+  de-duplicated in a pending map, and flushed on tab hide and unmount. A
+  40-minute episode produces a handful of writes rather than thousands.
+- **Resume** — captured once when an episode opens, so the player does not
+  chase its own progress writes. Never applied within the closing 20 s of an
+  episode, which would look like playback immediately ending.
+- Positions below 15 s are not recorded, so an accidental open does not
+  create a resume point.
+
+Sign-in is passwordless email OTP (`signInWithOtp`), which works against a
+stock Supabase project with no OAuth application to register. The form reports
+the same message whether or not an address has an account, so it cannot be
+used to enumerate users.

@@ -68,6 +68,9 @@ export function offlineGenres(): string[] {
 }
 
 function matches(record: MediaCatalogRecord, query: CatalogQuery): boolean {
+  // `season` is deliberately ignored: the seed carries a release year but not
+  // an airing season, and silently returning nothing would look like a bug.
+  // The UI already shows a banner when results come from the offline catalog.
   if (query.genre && !record.genres.some((genre) => genre.toLowerCase() === query.genre.toLowerCase())) return false;
   if (query.year && record.year !== query.year) return false;
   if (query.format && record.mediaFormat !== query.format) return false;

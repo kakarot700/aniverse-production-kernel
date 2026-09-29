@@ -356,6 +356,7 @@ main { width: min(calc(100% - 48px), var(--content-width)); margin: 0 auto; }
   .site-header, main, .site-footer { width: min(calc(100% - 34px), var(--content-width)); }
   .site-header { height: 70px; }
   .header-note, .header-nav a:nth-child(n+2) { display: none; }
+  .header-side { gap: 0; }
   .header-nav { gap: 14px; }
   .hero { grid-template-columns: 1fr; gap: 30px; padding: 54px 0 63px; }
   .hero-copy { max-width: 560px; }
@@ -584,3 +585,174 @@ main { width: min(calc(100% - 48px), var(--content-width)); margin: 0 auto; }
   .server-list { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .episode-grid { grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); max-height: 168px; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Account, watchlist, shelves, skip control
+   ───────────────────────────────────────────────────────────────────────── */
+.header-side { display: flex; align-items: center; gap: 14px; }
+.account-wrap { position: relative; }
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border: 1px solid rgba(84, 88, 101, 0.16);
+  border-radius: 999px;
+  padding: 0 13px;
+  background: rgba(255,255,255,0.72);
+  color: #5a5d67;
+  font-size: 0.78rem;
+  font-weight: 620;
+  cursor: pointer;
+}
+.account-chip:hover { border-color: rgba(98, 83, 166, 0.34); color: var(--accent-strong); }
+.account-chip-quiet { opacity: 0.6; cursor: default; }
+.account-avatar {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: #ebe7fa;
+  color: #51458d;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+.account-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 9px);
+  right: 0;
+  width: 272px;
+  border: 1px solid rgba(78, 84, 98, 0.15);
+  border-radius: 15px;
+  padding: 15px;
+  background: white;
+  box-shadow: 0 18px 44px rgba(24, 27, 38, 0.16);
+}
+.account-email { overflow-wrap: anywhere; margin: 0 0 6px; color: #33353d; font-size: 0.8rem; font-weight: 650; }
+.account-hint { margin: 0 0 12px; color: var(--muted); font-size: 0.74rem; line-height: 1.55; }
+.account-form { display: flex; gap: 7px; }
+.account-form input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 10px;
+  font-size: 0.76rem;
+}
+.account-form button {
+  flex: none;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: var(--accent);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.account-form button:disabled, .account-popover .button-quiet:disabled { cursor: not-allowed; opacity: 0.6; }
+.account-status { margin: 10px 0 0; color: #6d7079; font-size: 0.72rem; line-height: 1.5; }
+.account-popover .button-quiet { width: 100%; min-height: 34px; font-size: 0.76rem; }
+
+.modal-actions { display: flex; flex: none; align-items: center; gap: 9px; }
+.save-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 39px;
+  border: 1px solid rgba(84, 88, 101, 0.18);
+  border-radius: 999px;
+  padding: 0 15px;
+  background: rgba(255,255,255,0.8);
+  color: #53565f;
+  font-size: 0.79rem;
+  font-weight: 640;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+.save-button:hover { border-color: rgba(98, 83, 166, 0.38); }
+.save-button.is-saved { border-color: rgba(98, 83, 166, 0.45); background: #ebe7fa; color: #4c4086; }
+
+.shelf { width: min(calc(100% - 0px), var(--content-width)); margin: 0 auto 46px; }
+.shelf-head { margin-bottom: 15px; }
+.shelf-head h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.4rem, 2.2vw, 1.85rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+.shelf-head p { margin: 5px 0 0; color: var(--muted); font-size: 0.85rem; }
+.shelf-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(150px, 170px);
+  gap: 18px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.shelf-item { scroll-snap-align: start; }
+.shelf-item.card-skeleton { border-radius: 19px; }
+.shelf-footnote { margin: 6px 2px 0; color: #85888f; font-size: 0.71rem; }
+
+.filter-reset {
+  min-height: 34px;
+  border: 1px dashed rgba(84, 88, 101, 0.28);
+  border-radius: 999px;
+  padding: 0 13px;
+  background: transparent;
+  color: #777b85;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.filter-reset:hover { border-color: rgba(98, 83, 166, 0.4); color: var(--accent-strong); }
+
+.skip-button {
+  position: absolute;
+  z-index: 4;
+  right: 18px;
+  bottom: 62px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 999px;
+  padding: 0 18px;
+  background: rgba(16, 18, 26, 0.82);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 640;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+.skip-button:hover { transform: translateY(-1px); background: rgba(16, 18, 26, 0.94); }
+
+@media (max-width: 680px) {
+  .header-side { gap: 8px; }
+  .account-popover { right: -8px; width: min(84vw, 272px); }
+  .modal-actions { flex-direction: column-reverse; align-items: flex-end; gap: 7px; }
+  .save-button { min-height: 34px; padding: 0 12px; font-size: 0.74rem; }
+  .shelf-track { grid-auto-columns: minmax(132px, 148px); gap: 13px; }
+  .skip-button { right: 12px; bottom: 54px; min-height: 36px; padding: 0 14px; font-size: 0.76rem; }
+}
+
+.boundary { max-width: 620px; padding: clamp(60px, 12vh, 140px) 0; }
+.boundary h1 {
+  margin: 0 0 18px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.1rem, 4.4vw, 3.2rem);
+  font-weight: 400;
+  letter-spacing: -0.05em;
+  line-height: 1.04;
+}
+.boundary p { margin: 0 0 14px; color: #686c76; font-size: 1rem; line-height: 1.68; }
+.boundary-digest { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.76rem !important; }
+.boundary-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }

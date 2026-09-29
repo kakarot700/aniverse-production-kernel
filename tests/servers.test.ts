@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SERVER_REGISTRY, getServerDefinition, orderedServers } from '../lib/servers/registry';
 import { envKeyForServer, getServerRuntimeConfig, getSourceMapConfig } from '../lib/servers/config';
-import { lookupSourceMap, sanitizeSourceMap } from '../lib/servers/source-map';
+import { lookupSkipTimestamps, lookupSourceMap, sanitizeSourceMap } from '../lib/servers/source-map';
 import { resolveEpisodeMirrors } from '../lib/servers/resolve';
 import { isReferenceStreamsEnabled, pickReferenceStream } from '../lib/servers/reference-streams';
 import { getEffectiveAllowedHosts } from '../lib/servers/allowlist';
@@ -252,4 +252,37 @@ test('registry lookup by id works for every declared server', () => {
     assert.equal(getServerDefinition(server.id)?.name, server.name);
   }
   assert.equal(getServerDefinition('does-not-exist'), undefined);
+});
+
+test('skip timestamps are sanitised and surfaced per episode', () => {
+  const map = sanitizeSourceMap({
+    entries: {
+      'anilist:1': {
+        '1': [
+          { server: 'filemoon', fileId: 'a', skip: { introStart: 0, introEnd: 90, outroStart: 1320, outroEnd: 1400 } },
+        ],
+        // Reversed intro window: nonsensical, so the whole skip block is dropped.
+        '2': [{ server: 'filemoon', fileId: 'b', skip: { introStart: 90, introEnd: 10, outroStart: 1, outroEnd: 2 } }],
+        // Partial windows are dropped rather than half-applied.
+        '3': [{ server: 'filemoon', fileId: 'c', skip: { introStart: 0, introEnd: 90 } }],
+        '4': [{ server: 'filemoon', fileId: 'd', skip: { introStart: -5, introEnd: 90, outroStart: 1, outroEnd: 2 } }],
+        '5': [{ server: 'filemoon', fileId: 'e' }],
+      },
+    },
+  });
+
+  assert.deepEqual(lookupSkipTimestamps(map, 'anilist:1', 1), {
+    introStart: 0,
+    introEnd: 90,
+    outroStart: 1320,
+    outroEnd: 1400,
+  });
+  assert.equal(lookupSkipTimestamps(map, 'anilist:1', 2), undefined);
+  assert.equal(lookupSkipTimestamps(map, 'anilist:1', 3), undefined);
+  assert.equal(lookupSkipTimestamps(map, 'anilist:1', 4), undefined);
+  assert.equal(lookupSkipTimestamps(map, 'anilist:1', 5), undefined);
+  assert.equal(lookupSkipTimestamps(map, 'anilist:999', 1), undefined);
+
+  // A dropped skip block must not invalidate the mirror it was attached to.
+  assert.equal(lookupSourceMap(map, 'anilist:1', 2).length, 1);
 });

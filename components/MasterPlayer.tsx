@@ -23,6 +23,13 @@ interface MasterPlayerProps {
   onActiveServer: (serverId: string) => void;
   /** `true` while the title's detail payload is still loading. */
   loading?: boolean;
+  /** Stored resume point for this episode, in ms. 0 disables resuming. */
+  resumeAtMs?: number;
+}
+
+interface SkipWindow {
+  label: string;
+  toSeconds: number;
 }
 
 type WorkerEvent =
@@ -46,9 +53,11 @@ export function MasterPlayer({
   onProbe,
   onActiveServer,
   loading = false,
+  resumeAtMs = 0,
 }: MasterPlayerProps) {
   const [status, setStatus] = useState('');
   const [fatalError, setFatalError] = useState('');
+  const [skipWindow, setSkipWindow] = useState<SkipWindow | null>(null);
 
   // Callbacks live in refs so a parent re-render never restarts playback.
   const callbacks = useRef({ onProgress, onProbe, onActiveServer });
@@ -183,27 +192,47 @@ export function MasterPlayer({
         callbacks.current.onProgress(Math.max(0, Math.floor(video.currentTime * 1000)));
       }
 
+      // Offer a skip button rather than seeking on the viewer's behalf. The
+      // previous build silently jumped the playhead, which is indistinguishable
+      // from a stream glitch and cannot be declined.
       const skip = episode.skipTimestamps;
       if (!skip) return;
-      if (video.currentTime >= skip.introStart && video.currentTime < skip.introEnd && lastSkipPoint !== 'intro') {
-        lastSkipPoint = 'intro';
-        video.currentTime = skip.introEnd;
-      } else if (video.currentTime >= skip.outroStart && video.currentTime < skip.outroEnd && lastSkipPoint !== 'outro') {
-        lastSkipPoint = 'outro';
-        video.currentTime = skip.outroEnd;
-      } else if (video.currentTime > skip.introEnd && video.currentTime < skip.outroStart) {
-        lastSkipPoint = '';
+      const at = video.currentTime;
+      const next =
+        at >= skip.introStart && at < skip.introEnd
+          ? { label: 'Skip intro', toSeconds: skip.introEnd }
+          : at >= skip.outroStart && at < skip.outroEnd
+            ? { label: 'Skip outro', toSeconds: skip.outroEnd }
+            : null;
+      const key = next ? `${next.label}@${next.toSeconds}` : '';
+      if (key !== lastSkipPoint) {
+        lastSkipPoint = key;
+        setSkipWindow(next);
       }
+    };
+
+    // Resume where the viewer left off, but never within the closing moments
+    // of an episode, which would look like playback immediately ending.
+    const handleLoadedMetadata = () => {
+      if (resumeAtMs <= 0) return;
+      const target = resumeAtMs / 1000;
+      const duration = video.duration;
+      if (!Number.isFinite(duration) || target >= duration - 20) return;
+      if (Math.abs(video.currentTime - target) < 1) return;
+      video.currentTime = target;
+      setStatus(`Resumed at ${Math.floor(target / 60)}m ${Math.floor(target % 60)}s.`);
     };
 
     worker.addEventListener('message', handleWorkerMessage);
     video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
     worker.postMessage({ type: 'INITIALIZE_STREAM', payload: { requestId, mirrors: workerMirrors } });
 
     return () => {
       disposed = true;
       worker.removeEventListener('message', handleWorkerMessage);
       video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       worker.postMessage({ type: 'CANCEL_STREAM', payload: { requestId } });
       worker.terminate();
       releaseHls();
@@ -211,7 +240,7 @@ export function MasterPlayer({
     // `mirrorKey` collapses the mirror array into a primitive so the effect
     // does not restart on unrelated parent renders.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mirrorKey, isEmbed, loading, videoRef, episode.skipTimestamps]);
+  }, [mirrorKey, isEmbed, loading, videoRef, episode.skipTimestamps, resumeAtMs]);
 
   if (loading) {
     return (
@@ -261,6 +290,19 @@ export function MasterPlayer({
           poster={poster}
           aria-label={`Video player: ${episode.episodeTitle}`}
         />
+        {skipWindow && !fatalError ? (
+          <button
+            type="button"
+            className="skip-button"
+            onClick={() => {
+              const video = videoRef.current;
+              if (video) video.currentTime = skipWindow.toSeconds;
+              setSkipWindow(null);
+            }}
+          >
+            {skipWindow.label} <span aria-hidden="true">→</span>
+          </button>
+        ) : null}
         {fatalError ? (
           <div className="player-empty" aria-live="polite">
             <div>

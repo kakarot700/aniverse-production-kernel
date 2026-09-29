@@ -40,8 +40,10 @@ Metadata comes from a three-step provider chain, each step best-effort:
 A provider failure downgrades to the next one and reports a `degraded` note
 the UI shows as a banner, rather than producing an error page.
 
-Search, genre/format filters, five sort orders, and paging all run against the
-full database. See [docs/CATALOG.md](docs/CATALOG.md) for the API surface.
+Search, genre/format/season/year filters, five sort orders, and paging all run
+against the full database. Opening a title writes `?title=<id>&ep=<n>` to the
+URL, so a link — including a watch-room invite — always resolves to the same
+title and episode. See [docs/CATALOG.md](docs/CATALOG.md) for the API surface.
 
 ## Stream servers
 
@@ -73,6 +75,19 @@ redirects to non-allowlisted hosts, and rewrites nested playlist, segment, and
 key URLs back through the same origin. `core/stream.worker.ts` probes mirrors
 off the main thread with a 6 second deadline, reports per-server latency, and
 fails over automatically.
+
+## Accounts, watchlist, and resume
+
+Signing in is optional; the catalog and playback work without it. When
+Supabase is configured, the header offers passwordless email sign-in and the
+app gains:
+
+- **Your list** — a watchlist toggle in the player and a shelf on the home page.
+- **Continue watching** — playback progress is recorded (debounced, at most one
+  write per 5 s per episode) and the player resumes where you left off.
+
+All of it runs through the RLS-scoped helpers in `lib/supabase/repositories.ts`
+and is restricted to `auth.uid()` ownership by the included migration.
 
 ## Supabase setup
 

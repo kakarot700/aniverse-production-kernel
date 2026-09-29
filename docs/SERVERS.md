@@ -130,6 +130,22 @@ distribute, and the app resolves it.
 }
 ```
 
+Entries may also carry intro/outro markers, which surface as a **Skip intro** /
+**Skip outro** button over the player:
+
+```json
+{
+  "server": "aniverse-origin",
+  "url": "https://cdn.example.com/aot/01/master.m3u8",
+  "skip": { "introStart": 0, "introEnd": 90, "outroStart": 1320, "outroEnd": 1400 }
+}
+```
+
+All four values are required, in seconds, and each window must be non-empty and
+forward-ordered; a partial or reversed block is dropped without invalidating
+the mirror it was attached to. The first entry that declares `skip` for an
+episode wins.
+
 - Keys are catalog ids (`anilist:<id>`, `mal:<id>`, `offline:<slug>`) → episode
   number → a list of entries in priority order.
 - `url` takes precedence over `fileId`. It must be `https`.
