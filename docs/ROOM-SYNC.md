@@ -1,0 +1,5 @@
+# Watch-room synchronization
+
+The browser sends playback snapshots with a sender sequence number, playhead position, playing state, and wall-clock send timestamp. A private Supabase Broadcast channel exchanges those snapshots and four-timestamp ping/pong samples; the client chooses low-round-trip samples to estimate peer clock offset. Newer snapshots predict the remote playhead at local receive time. Differences within the configurable 10 ms tolerance are left alone; smaller differences outside that tolerance use a bounded playback-rate nudge, and large differences seek.
+
+The 10 ms figure is an algorithmic correction tolerance, not a demonstrated end-to-end synchronization guarantee. WebSocket delivery and scheduling are subject to browser/device timers, decode/render timing, network RTT/jitter, congestion, and Supabase region. Validate with at least two real clients in the intended deployment region and report measured median/tail drift before making performance commitments. Room links are bearer invites based on random UUIDs; do not broadcast sensitive data.

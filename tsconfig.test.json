@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": false,
+    "incremental": false,
+    "outDir": ".test-dist",
+    "types": ["node"],
+    "rootDir": "."
+  },
+  "include": ["tests/**/*.test.ts", "lib/media-proxy.ts", "lib/watch-sync.ts"]
+}

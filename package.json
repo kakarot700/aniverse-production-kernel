@@ -1,0 +1,31 @@
+{
+  "name": "aniverse-production-kernel",
+  "version": "1.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint app components core hooks lib tests types --ext .ts,.tsx",
+    "test": "tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.2",
+    "next": "15.5.26",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "framer-motion": "^11.5.4",
+    "hls.js": "^1.5.15",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.7",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "15.5.26",
+    "typescript": "^5.8.3"
+  }
+}
