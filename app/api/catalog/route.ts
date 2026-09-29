@@ -1,32 +1,19 @@
-// Look inside app/api/catalog/route.ts to see this exact mapping:
+import { NextResponse } from 'next/server';
+import { getPublicCatalog } from '@/lib/catalog';
 
-const serverCatalogMatrix: MediaCatalogRecord[] = [
-  {
-    id: "bleach-tybw-masterpiece",
-    title: "Bleach: Thousand-Year Blood War",
-    // ... metadata continues
-    episodes: [
-      {
-        episodeNumber: 1,
-        mirrors: [
-          // 🏆 1. The Premium "Big 3" High-Throughput Media Servers
-          { serverName: "Vidstream / Vidplay", manifestUrl: "https://vidplay.online", requiresProxy: true },
-          { serverName: "MyCloud (MCloud)", manifestUrl: "https://mcloud.to", requiresProxy: true },
-          { serverName: "Filemoon", manifestUrl: "https://filemoon.sx", requiresProxy: true },
-          
-          // 💰 2. Webmaster PPV Scaled High-Storage Infrastructure Nodes
-          { serverName: "DoodStream Node", manifestUrl: "https://doodstream.com", requiresProxy: true },
-          { serverName: "Streamtape Mirror", manifestUrl: "https://streamtape.com", requiresProxy: true },
-          { serverName: "Voe.sx Cluster", manifestUrl: "https://voe.sx", requiresProxy: true },
-          { serverName: "Streamwish Node", manifestUrl: "https://streamwish.to", requiresProxy: true },
-          { serverName: "Vidhide Secure Node", manifestUrl: "https://vidhide.com", requiresProxy: true },
-          
-          // 🔄 3. Legacy Frame-Accurate Performance Nodes
-          { serverName: "Mp4Upload High-Bitrate", manifestUrl: "https://mp4upload.com", requiresProxy: false },
-          { serverName: "Netu.tv Resilient Core", manifestUrl: "https://netu.io", requiresProxy: false },
-          { serverName: "Mixdrop Alternative Path", manifestUrl: "https://mixdrop.co", requiresProxy: true }
-        ]
-      }
-    ]
-  }
-];
+/**
+ * GET /api/catalog
+ *
+ * Serves the catalog that `lib/catalog.ts` defines, projected through
+ * `getPublicCatalog()` so mirror manifest URLs never reach a client-visible
+ * payload. Mirror URLs must come from the application's trusted catalog source
+ * and be resolved server-side; see README "Authorized HLS sources".
+ */
+export async function GET() {
+  const items = getPublicCatalog();
+
+  return NextResponse.json(
+    { items, count: items.length },
+    { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } },
+  );
+}

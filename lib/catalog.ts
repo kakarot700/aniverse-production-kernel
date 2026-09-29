@@ -1,4 +1,9 @@
-import type { MediaCatalogRecord } from '@/types/media';
+import type {
+  MediaCatalogRecord,
+  MediaEpisodePayload,
+  PublicCatalogRecord,
+  PublicEpisodePayload,
+} from '@/types/media';
 
 export const catalog: MediaCatalogRecord[] = [
   {
@@ -52,3 +57,41 @@ export const catalog: MediaCatalogRecord[] = [
     episodes: [{ episodeNumber: 1, episodeTitle: 'Feature', mirrors: [] }],
   },
 ];
+
+/**
+ * Build the client-safe view of an episode.
+ *
+ * This is an explicit allowlist rather than an `Omit`-style denylist: any field
+ * added to `MediaEpisodePayload` later stays private until it is named here,
+ * so a future private field cannot leak through this endpoint by default.
+ */
+function toPublicEpisode(episode: MediaEpisodePayload): PublicEpisodePayload {
+  const publicEpisode: PublicEpisodePayload = {
+    episodeNumber: episode.episodeNumber,
+    episodeTitle: episode.episodeTitle,
+    mirrorCount: episode.mirrors.length,
+  };
+  if (episode.skipTimestamps) publicEpisode.skipTimestamps = episode.skipTimestamps;
+  return publicEpisode;
+}
+
+/** Build the client-safe view of a catalog record (allowlisted fields only). */
+export function toPublicCatalogRecord(record: MediaCatalogRecord): PublicCatalogRecord {
+  const publicRecord: PublicCatalogRecord = {
+    id: record.id,
+    title: record.title,
+    synopsis: record.synopsis,
+    coverPoster: record.coverPoster,
+    genre: record.genre,
+    year: record.year,
+    format: record.format,
+    episodes: record.episodes.map(toPublicEpisode),
+  };
+  if (record.previewUrl) publicRecord.previewUrl = record.previewUrl;
+  return publicRecord;
+}
+
+/** The whole catalog, projected for public/API consumption. */
+export function getPublicCatalog(): PublicCatalogRecord[] {
+  return catalog.map(toPublicCatalogRecord);
+}
