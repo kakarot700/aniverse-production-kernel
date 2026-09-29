@@ -8,7 +8,7 @@
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
     "lint": "eslint app components core hooks lib tests types --ext .ts,.tsx",
-    "test": "tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js"
+    "test": "tsc -p tsconfig.test.json && node --require ./tests/alias.cjs --test .test-dist/tests/*.test.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

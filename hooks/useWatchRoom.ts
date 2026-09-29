@@ -42,7 +42,13 @@ function isClockPong(value: unknown): value is ClockPong {
     && Number.isFinite(pong.peerSentAt);
 }
 
-export function useWatchRoom(videoRef: RefObject<HTMLVideoElement | null>, roomId: string) {
+/**
+ * @param videoEpoch Bumped by the caller whenever the `<video>` element is
+ * mounted or replaced. The effect captures `videoRef.current` once, so without
+ * this the hook would silently bind to nothing when a room is joined before
+ * the player has finished loading its mirrors.
+ */
+export function useWatchRoom(videoRef: RefObject<HTMLVideoElement | null>, roomId: string, videoEpoch = 0) {
   const [roomState, setRoomState] = useState<WatchRoomState>({ state: 'idle', error: '', driftMs: null, roundTripMs: null });
   const peerIdRef = useRef('');
   const sequenceRef = useRef(0);
@@ -203,7 +209,7 @@ export function useWatchRoom(videoRef: RefObject<HTMLVideoElement | null>, roomI
       subscribed = false;
       void supabase.removeChannel(channel);
     };
-  }, [roomId, videoRef]);
+  }, [roomId, videoRef, videoEpoch]);
 
   return roomState;
 }

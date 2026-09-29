@@ -26,5 +26,15 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|webm)$).*)'],
+  /**
+   * Page requests only.
+   *
+   * The previous matcher also covered `/api/*`, which meant every single HLS
+   * segment fetched through `/api/proxy` triggered a Supabase session refresh
+   * — an extra network round trip per segment, several per second during
+   * playback. API routes that need a user build their own client instead.
+   */
+  matcher: [
+    '/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|webm|ico|txt|xml)$).*)',
+  ],
 };

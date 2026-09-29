@@ -1,1 +1,16 @@
-The attached starter archive supplied no video clips. This project ships no generated, synthesized, or transcoded video. Poster files were collected from visual-search results for layout prototyping; no visible stock watermark was observed, but source licensing has not been independently verified. Replace them with artwork that is owned or properly licensed before public commercial launch. `bleach-tybw.jpg` is an original AI-generated placeholder key art for the `/api/catalog` server-catalog record; replace it with owned or licensed artwork the same way. See `docs/PREVIEW-ASSETS.md` for how to add a real optional preview clip.
+This directory is intentionally empty of artwork.
+
+Cover images now come from two places:
+  1. The live metadata providers (AniList / Jikan) serve their own CDN URLs
+     for real titles. Nothing is copied into this repository.
+  2. The bundled offline catalog renders generated SVG covers through
+     `/api/poster` (see `lib/poster.ts`). They are deterministic, need no
+     network, and carry no third-party licensing question.
+
+The previous placeholder JPEGs were removed: they were collected from image
+search with unverified licensing, and after the catalog rewrite nothing
+referenced them any more.
+
+If you add local artwork, put owned or properly licensed files here and point
+a catalog record's `coverPoster` at `/posters/<file>`.
+See `docs/PREVIEW-ASSETS.md` for optional hover-preview clips.

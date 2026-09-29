@@ -10,5 +10,5 @@
     "types": ["node"],
     "rootDir": "."
   },
-  "include": ["tests/**/*.test.ts", "lib/media-proxy.ts", "lib/watch-sync.ts"]
+  "include": ["tests/**/*.test.ts"]
 }

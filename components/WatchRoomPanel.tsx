@@ -19,14 +19,20 @@ function updateRoomUrl(roomId: string): void {
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
-interface WatchRoomPanelProps { videoRef: RefObject<HTMLVideoElement | null> }
+interface WatchRoomPanelProps {
+  videoRef: RefObject<HTMLVideoElement | null>;
+  /** Changes whenever the `<video>` element mounts, so the hook can re-bind. */
+  videoEpoch?: number;
+  /** Set when sync cannot work, e.g. a cross-origin embedded player. */
+  unavailableReason?: string;
+}
 
-export function WatchRoomPanel({ videoRef }: WatchRoomPanelProps) {
+export function WatchRoomPanel({ videoRef, videoEpoch = 0, unavailableReason = '' }: WatchRoomPanelProps) {
   const [roomId, setRoomId] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
-  const connected = isSupabaseConfigured();
-  const room = useWatchRoom(videoRef, roomId);
+  const connected = isSupabaseConfigured() && !unavailableReason;
+  const room = useWatchRoom(videoRef, roomId, videoEpoch);
 
   useEffect(() => {
     const existingRoom = getRoomFromUrl();
@@ -96,7 +102,11 @@ export function WatchRoomPanel({ videoRef }: WatchRoomPanelProps) {
       ) : <p className="room-code" aria-label="Current room ID">{roomId}</p>}
       <p className="room-status" role="status" aria-live="polite">{room.error || copyStatus || stateLabel}</p>
       {roomId ? <div className="room-metrics"><span>{stateLabel}</span><span>{room.driftMs === null ? '—' : `Drift ${room.driftMs} ms`}</span><span>{room.roundTripMs === null ? '—' : `RTT ${room.roundTripMs} ms`}</span></div> : null}
-      {!connected ? <p className="room-status">Configure the public Supabase URL and publishable key to enable room sync.</p> : null}
+      {unavailableReason ? (
+        <p className="room-status">{unavailableReason}</p>
+      ) : !connected ? (
+        <p className="room-status">Configure the public Supabase URL and publishable key to enable room sync.</p>
+      ) : null}
     </aside>
   );
 }
