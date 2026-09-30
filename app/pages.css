@@ -135,7 +135,7 @@
   color: var(--text-muted);
   cursor: pointer;
 }
-.day-chip.is-active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.day-chip.is-active { background: var(--brand-fill); border-color: var(--brand-fill); color: var(--glass); }
 .day-chip-label { font-size: 0.82rem; font-weight: 650; white-space: nowrap; }
 .day-chip-count { font-size: 0.72rem; opacity: 0.75; font-variant-numeric: tabular-nums; }
 
@@ -366,7 +366,7 @@
   width: 24px; height: 24px;
   margin: 3px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--glass);
   box-shadow: var(--shadow-1);
   transition: transform var(--dur) var(--ease);
 }
@@ -431,8 +431,8 @@
   min-width: 108px;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
-  background: rgba(12, 13, 20, 0.78);
-  color: #fff;
+  background: rgb(var(--scrim-rgb) / 0.78);
+  color: var(--glass);
   backdrop-filter: blur(8px);
   pointer-events: none;
   /* Placed above centre: dead centre is where the eye is already watching
@@ -447,7 +447,128 @@
   display: block;
   width: 96px; height: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.28);
+  background: rgb(var(--glass-rgb) / 0.28);
   overflow: hidden;
 }
-.gesture-bar > span { display: block; height: 100%; background: #fff; border-radius: 999px; }
+.gesture-bar > span { display: block; height: 100%; background: var(--glass); border-radius: 999px; }
+
+/* ─────────────────────────── home ─────────────────────────── */
+
+.home { display: flex; flex-direction: column; gap: var(--space-7); }
+
+/**
+ * Cinematic hero.
+ *
+ * Full-bleed out of the content padding so the artwork reaches the edges of
+ * the reading column on mobile — a poster inset behind a margin reads as a
+ * thumbnail, not a hero.
+ */
+.hero-cinema {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-end;
+  min-height: clamp(320px, 52dvh, 520px);
+  margin-inline: calc(var(--space-4) * -1);
+  margin-top: calc(var(--space-5) * -1);
+  padding: var(--space-6) var(--space-4) var(--space-5);
+  overflow: hidden;
+}
+
+.hero-cinema-art { position: absolute; inset: 0; z-index: -1; }
+.hero-cinema-art img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Two stacked scrims rather than one: a vertical ramp to seat the text and
+   a horizontal one so the left edge stays legible on wide screens, where
+   the copy sits over the middle of the image rather than its dark corner. */
+.hero-cinema-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, var(--paper) 2%, rgb(var(--paper-rgb) / 0.82) 32%, rgb(var(--paper-rgb) / 0.25) 70%),
+    linear-gradient(to right, rgb(var(--paper-rgb) / 0.88), rgb(var(--paper-rgb) / 0.15) 65%);
+}
+
+.hero-cinema-copy { max-width: 620px; display: grid; gap: var(--space-3); }
+.hero-cinema-copy h1 {
+  margin: 0;
+  font-size: clamp(1.9rem, 1.2rem + 3.6vw, 3.4rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  /* Balanced wrapping stops a two-line title leaving one orphan word. */
+  text-wrap: balance;
+}
+.hero-cinema-meta {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.hero-cinema-synopsis {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  max-width: 54ch;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hero-cinema-skeleton {
+  width: 100%;
+  min-height: clamp(320px, 52dvh, 520px);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(110deg, var(--surface-2) 30%, var(--surface) 50%, var(--surface-2) 70%);
+  background-size: 220% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer { to { background-position: -220% 0; } }
+
+@media (min-width: 768px) {
+  .hero-cinema {
+    margin-inline: calc(var(--space-5) * -1);
+    margin-top: calc(var(--space-6) * -1);
+    padding: var(--space-7) var(--space-6) var(--space-6);
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  }
+}
+@media (min-width: 1200px) {
+  .hero-cinema { margin-inline: calc(var(--space-6) * -1); }
+}
+
+/* The brand fill needs light text in both themes, and a gradient reads as
+   deliberate where a flat violet reads as a default button. */
+.button-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding: 0 var(--space-5);
+  border-radius: 999px;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgb(var(--brand-rgb) / 0.35);
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+.button-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgb(var(--brand-rgb) / 0.45); }
+
+.button-quiet {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-5);
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* Shelves need generous vertical rhythm or the page reads as one dense
+   block rather than a set of distinct offers. */
+.shelf { display: grid; gap: var(--space-4); }

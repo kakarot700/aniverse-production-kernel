@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CatalogCard } from '@/components/CatalogCard';
+import { CatalogRail } from '@/components/CatalogRail';
 import { ContinueShelf, RecommendationShelf, WatchlistShelf } from '@/components/LibraryShelf';
 import { TitleDialog } from '@/components/TitleDialog';
 import { useCatalog } from '@/hooks/useAnimeData';
@@ -21,21 +21,23 @@ interface HomeViewProps {
 /**
  * Home.
  *
- * Ordering is the whole design here. Continue Watching sits above everything
- * else — including the hero — the moment it has anything in it, because
- * resuming is overwhelmingly the most common reason someone opens a
- * streaming app. Every study of this pattern says the same thing, and it is
- * a bigger win than any amount of navigation polish.
+ * Shaped as a stack of shelves rather than one grid, because the job of this
+ * page is to offer a shortlist from several angles, not to be a catalog —
+ * that is what Discover is for.
  *
- * Browsing lives on Discover. Home is for "what was I watching" and "what
- * should I watch", nothing else.
+ * Ordering is the actual design. Continue Watching sits above everything
+ * including the hero the moment it has anything in it, because resuming is
+ * overwhelmingly the most common reason anyone opens a streaming app. Every
+ * study of the pattern agrees, and it outweighs any amount of nav polish.
  */
 export function HomeView({ initialPage, currentSeason }: HomeViewProps) {
   const [selected, setSelected] = useState<AnimeSummary | null>(null);
   const roomHandledRef = useRef(false);
   const library = useLibrary();
 
-  const catalog = useCatalog({
+  // The hero and the first rail share this one request; the remaining rails
+  // fetch their own so the page streams in rather than blocking.
+  const trending = useCatalog({
     mode: 'trending',
     search: '',
     genre: '',
@@ -50,15 +52,15 @@ export function HomeView({ initialPage, currentSeason }: HomeViewProps) {
     if (!library.state) return { items: [], genres: [] as string[] };
     const profile = profileFromLibrary(library.state);
     if (profile.strength <= 0) return { items: [], genres: [] as string[] };
-    return { items: recommend(catalog.items, profile, { limit: 12 }), genres: topGenres(profile) };
-  }, [catalog.items, library.state]);
+    return { items: recommend(trending.items, profile, { limit: 12 }), genres: topGenres(profile) };
+  }, [trending.items, library.state]);
 
   const featured = useMemo(
-    () => initialPage?.items[0] ?? catalog.items[0] ?? null,
-    [catalog.items, initialPage],
+    () => initialPage?.items[0] ?? trending.items[0] ?? null,
+    [trending.items, initialPage],
   );
 
-  // A `?room=<uuid>` deep link opens the player so the invitee lands in the
+  // A `?room=<uuid>` deep link opens the player so an invitee lands in the
   // same dialog as the host.
   useEffect(() => {
     if (roomHandledRef.current || !featured) return;
@@ -73,90 +75,107 @@ export function HomeView({ initialPage, currentSeason }: HomeViewProps) {
   const seasonLabel = `${currentSeason.season.charAt(0)}${currentSeason.season.slice(1).toLowerCase()} ${currentSeason.year}`;
 
   return (
-    <>
+    <div className="home">
+      {/* Cinematic hero. Full-bleed artwork with the copy laid over it —
+          the previous split of text beside a small card gave the artwork no
+          room to do its job, which on a catalog page is most of the job. */}
+      <section className="hero-cinema" aria-labelledby="hero-title">
+        {featured ? (
+          <>
+            <div className="hero-cinema-art" aria-hidden="true">
+              <img
+                src={featured.bannerImage || featured.coverImage}
+                alt=""
+                fetchPriority="high"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <div className="hero-cinema-copy">
+              <p className="eyebrow">Featured · {seasonLabel}</p>
+              <h1 id="hero-title">{featured.title}</h1>
+              <p className="hero-cinema-meta">
+                {[
+                  featured.genres.slice(0, 3).join(' · ') || formatLabel(featured.format),
+                  describeRuntime(featured),
+                  featured.averageScore ? `${featured.averageScore}% rated` : null,
+                ]
+                  .filter(Boolean)
+                  .join('  •  ')}
+              </p>
+              {featured.synopsis ? (
+                <p className="hero-cinema-synopsis">{featured.synopsis}</p>
+              ) : null}
+              <div className="hero-actions">
+                <button type="button" className="button-primary" onClick={() => setSelected(featured)}>
+                  ▶ Watch now
+                </button>
+                <Link className="button-quiet" href="/discover">Browse catalog</Link>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="hero-cinema-skeleton" aria-hidden="true">
+            <h1 id="hero-title" className="sr-only">Aniverse</h1>
+          </div>
+        )}
+      </section>
+
       {/* Resume first, whenever there is something to resume. */}
       {hasContinue ? (
         <ContinueShelf items={library.continueRow} onOpen={setSelected} onForget={library.forget} />
       ) : null}
-
-      <section className={hasContinue ? 'hero hero-compact' : 'hero'} aria-labelledby="hero-title">
-        <div className="hero-copy">
-          <p className="eyebrow">Every anime, one calm place</p>
-          <h1 id="hero-title">
-            {hasContinue ? 'Something new for after.' : 'Find your next little world.'}
-          </h1>
-          <p>
-            Search the complete anime database — every series, film, OVA and ONA — then play it through whichever
-            stream server answers fastest, together with a friend if you like.
-          </p>
-          <div className="hero-actions">
-            <Link className="button-primary" href="/discover">
-              Explore the collection <span aria-hidden="true">↘</span>
-            </Link>
-            <Link className="button-quiet" href="/schedule">This week’s schedule</Link>
-          </div>
-        </div>
-        {featured ? (
-          <button
-            className="hero-art"
-            type="button"
-            onClick={() => setSelected(featured)}
-            aria-label={`Explore featured story ${featured.title}`}
-          >
-            <img
-              src={featured.bannerImage || featured.coverImage}
-              alt=""
-              fetchPriority="high"
-              referrerPolicy="no-referrer"
-            />
-            <span className="featured-seal">Trending now</span>
-            <span className="hero-art-copy">
-              <span>Featured{featured.year ? ` · ${featured.year}` : ''}</span>
-              <strong>{featured.title}</strong>
-              <small>
-                {featured.genres.slice(0, 2).join(' · ') || formatLabel(featured.format)} · {describeRuntime(featured)}
-              </small>
-            </span>
-          </button>
-        ) : (
-          <div className="hero-art hero-art-skeleton" aria-hidden="true" />
-        )}
-      </section>
 
       <RecommendationShelf
         items={recommendations.items}
         topGenres={recommendations.genres}
         onOpen={setSelected}
       />
+
+      {/* The first rail reuses the hero's request; the rest fetch their own. */}
+      <CatalogRail
+        mode="trending"
+        title="Trending now"
+        eyebrow="What everyone is watching"
+        href="/discover"
+        initialPage={initialPage}
+        onSelect={setSelected}
+      />
+
       <WatchlistShelf items={library.watchlist} onOpen={setSelected} />
 
-      <section className="shelf" aria-labelledby="trending-title">
-        <div className="shelf-head">
-          <div>
-            <p className="eyebrow">{seasonLabel}</p>
-            <h2 id="trending-title">Trending now</h2>
-          </div>
-          <Link className="shelf-more" href="/discover">Browse all →</Link>
-        </div>
+      <CatalogRail
+        mode="seasonal"
+        title={`${seasonLabel} anime`}
+        eyebrow="Airing this season"
+        href="/schedule"
+        onSelect={setSelected}
+      />
 
-        {catalog.loading && catalog.items.length === 0 ? (
-          <div className="rail" aria-hidden="true">
-            {Array.from({ length: 8 }, (_, index) => <div className="card-skeleton rail-item" key={index} />)}
-          </div>
-        ) : (
-          // A scroll-snapped rail rather than a grid: it keeps Home to one
-          // screen of vertical scroll on a phone while still showing depth.
-          <ul className="rail">
-            {catalog.items.slice(0, 18).map((item) => (
-              <li className="rail-item" key={item.id}>
-                <CatalogCard item={item} onSelect={setSelected} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <CatalogRail
+        mode="top"
+        title="Highest rated of all time"
+        eyebrow="The canon"
+        href="/discover"
+        onSelect={setSelected}
+      />
 
-      {catalog.degraded ? (
+      <CatalogRail
+        mode="popular"
+        title="Most popular"
+        eyebrow="Never a wrong answer"
+        href="/discover"
+        onSelect={setSelected}
+      />
+
+      <CatalogRail
+        mode="upcoming"
+        title="Coming soon"
+        eyebrow="Next season"
+        href="/discover"
+        onSelect={setSelected}
+      />
+
+      {trending.degraded ? (
         <p className="degraded-banner" role="status">
           Live anime sources are unreachable from the server, so this is the bundled offline sample. The browser
           retries AniList directly — if you still see this, check network access to <code>graphql.anilist.co</code>.
@@ -166,6 +185,6 @@ export function HomeView({ initialPage, currentSeason }: HomeViewProps) {
       {selected ? (
         <TitleDialog key={selected.id} summary={selected} onClose={() => setSelected(null)} />
       ) : null}
-    </>
+    </div>
   );
 }

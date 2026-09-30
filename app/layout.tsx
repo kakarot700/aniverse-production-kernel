@@ -22,8 +22,8 @@ export const viewport: Viewport = {
   // bar sits under the home indicator.
   viewportFit: 'cover',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f8fafc' },
-    { media: '(prefers-color-scheme: dark)', color: '#0e0f15' },
+    { media: '(prefers-color-scheme: light)', color: '#f7f8fc' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0b11' },
   ],
 };
 

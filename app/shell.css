@@ -12,7 +12,9 @@
 /* ─────────────────────────── design tokens ─────────────────────────── */
 
 :root {
-  /* Spacing scale, used everywhere instead of magic numbers. */
+  /* Layout scale only. Colour lives in globals.css, which owns the theme
+     system; duplicating tokens here would silently win over it, because
+     this file is imported later. */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -31,102 +33,32 @@
   --topbar-height: 60px;
   --tabbar-height: 62px;
 
-  /* Touch targets never go below this. WCAG 2.2 target size is 24px minimum;
+  /* Touch targets never go below this. WCAG 2.2 requires 24px minimum;
      44px is the platform convention and what thumbs actually need. */
   --tap-target: 44px;
 
-  --surface: #ffffff;
-  --surface-2: #f4f4f8;
-  --surface-sunken: rgba(17, 18, 26, 0.04);
-  --border: rgba(74, 79, 93, 0.14);
-  --border-strong: rgba(74, 79, 93, 0.26);
-  --text: #22232a;
-  --text-muted: #6b6f7b;
-  --text-faint: #9297a3;
-  --brand: #6253a6;
-  --brand-strong: #4f438d;
-  --brand-wash: #ede9fe;
-  --positive: #0f7a5a;
-  --warning: #9a6b1f;
-  --danger: #b4483f;
-
-  --shadow-1: 0 1px 2px rgba(24, 26, 38, 0.06), 0 2px 8px rgba(24, 26, 38, 0.05);
-  --shadow-2: 0 8px 28px rgba(24, 26, 38, 0.10);
-  --shadow-3: 0 24px 64px rgba(24, 26, 38, 0.18);
+  --shadow-1: 0 1px 2px rgb(var(--scrim-rgb) / 0.30), 0 2px 8px rgb(var(--scrim-rgb) / 0.22);
+  --shadow-2: 0 8px 28px rgb(var(--scrim-rgb) / 0.38);
+  --shadow-3: 0 24px 64px rgb(var(--scrim-rgb) / 0.55);
 
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --dur-fast: 120ms;
   --dur: 200ms;
 }
 
-/* Dark theme. Applied by OS preference, or forced by the settings page via
-   a data attribute on <html> so the choice survives a reload. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-    --paper: #0e0f15;
-    --surface: #16181f;
-    --surface-2: #1c1f28;
-    --surface-sunken: rgba(255, 255, 255, 0.05);
-    --border: rgba(255, 255, 255, 0.10);
-    --border-strong: rgba(255, 255, 255, 0.20);
-    --text: #eceef4;
-    --ink: #eceef4;
-    --text-muted: #a2a8b8;
-    --text-faint: #767d8f;
-    --brand: #a996f5;
-    --brand-strong: #c3b6ff;
-    --brand-wash: rgba(139, 122, 226, 0.18);
-    --lavender: rgba(139, 122, 226, 0.20);
-    --mint: rgba(52, 168, 128, 0.18);
-    --line: rgba(255, 255, 255, 0.10);
-    --muted: #a2a8b8;
-    --accent: #a996f5;
-    --accent-strong: #c3b6ff;
-    --positive: #4ecfa0;
-    --warning: #e0b054;
-    --danger: #f0847a;
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.5);
-    --shadow-3: 0 24px 64px rgba(0, 0, 0, 0.62);
-  }
+/* The pastel mesh backdrop was designed for a white page. On the dark
+   theme it reads as haze over the artwork, so it is dialled right back and
+   re-tinted to the brand instead of being left to glow. */
+:root .mesh-backdrop {
+  opacity: 0.5;
+  background:
+    radial-gradient(ellipse at 17% 13%, rgb(var(--brand-rgb) / 0.30), transparent 48%),
+    radial-gradient(ellipse at 79% 18%, rgb(var(--accent2-rgb) / 0.18), transparent 42%),
+    radial-gradient(ellipse at 54% 74%, rgb(var(--brand-rgb) / 0.14), transparent 38%);
 }
-
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --paper: #0e0f15;
-  --surface: #16181f;
-  --surface-2: #1c1f28;
-  --surface-sunken: rgba(255, 255, 255, 0.05);
-  --border: rgba(255, 255, 255, 0.10);
-  --border-strong: rgba(255, 255, 255, 0.20);
-  --text: #eceef4;
-  --ink: #eceef4;
-  --text-muted: #a2a8b8;
-  --text-faint: #767d8f;
-  --brand: #a996f5;
-  --brand-strong: #c3b6ff;
-  --brand-wash: rgba(139, 122, 226, 0.18);
-  --lavender: rgba(139, 122, 226, 0.20);
-  --mint: rgba(52, 168, 128, 0.18);
-  --line: rgba(255, 255, 255, 0.10);
-  --muted: #a2a8b8;
-  --accent: #a996f5;
-  --accent-strong: #c3b6ff;
-  --positive: #4ecfa0;
-  --warning: #e0b054;
-  --danger: #f0847a;
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.5);
-  --shadow-3: 0 24px 64px rgba(0, 0, 0, 0.62);
-}
-
-:root[data-theme='dark'] .mesh-backdrop,
-:root:not([data-theme='light']) .mesh-backdrop {
-  opacity: 0.35;
-}
+:root[data-theme='light'] .mesh-backdrop { opacity: 0.85; }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) .mesh-backdrop { opacity: 1; }
+  :root:not([data-theme='dark']) .mesh-backdrop { opacity: 0.85; }
 }
 
 /* ─────────────────────────── shell layout ─────────────────────────── */
@@ -159,8 +91,8 @@
   left: -9999px;
   z-index: 100;
   padding: var(--space-3) var(--space-4);
-  background: var(--brand);
-  color: #fff;
+  background: var(--brand-fill);
+  color: var(--glass);
   border-radius: var(--radius-sm);
 }
 .skip-link:focus {
@@ -425,7 +357,7 @@ kbd {
   align-items: flex-start;
   padding: var(--space-4);
   padding-top: max(var(--space-6), 8dvh);
-  background: rgba(12, 13, 20, 0.5);
+  background: rgb(var(--scrim-rgb) / 0.62);
   backdrop-filter: blur(6px);
   animation: overlay-in var(--dur) var(--ease);
 }
