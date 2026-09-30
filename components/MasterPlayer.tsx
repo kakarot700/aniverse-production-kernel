@@ -4,6 +4,8 @@ import Hls, { type ErrorData, type Level } from 'hls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isProbeable, playbackUrlFor, mirrorsSignature } from '@/lib/stream-url';
 import type { SkipTimestamps, StreamMirrorNode } from '@/types/media';
+import { useQoeSession } from '@/hooks/useQoeSession';
+import { describeQoe } from '@/lib/streams/qoe';
 import type { WorkerRequest, WorkerResponse } from '@/core/stream.worker';
 
 interface MasterPlayerProps {
@@ -16,6 +18,8 @@ interface MasterPlayerProps {
   requestedMirrorIndex?: number | null;
   /** Seconds to resume from on first play, from the continue-watching library. */
   startPositionSeconds?: number;
+  /** Stable id for this title+episode, used as the CMCD `cid`. */
+  contentId?: string;
   onProgress?: (positionMs: number, durationMs: number) => void;
   onVideoElement?: (element: HTMLVideoElement | null) => void;
   onActiveMirrorChange?: (index: number | null) => void;
@@ -114,6 +118,7 @@ export function MasterPlayer({
   skipTimestamps,
   loading = false,
   requestedMirrorIndex = null,
+  contentId,
   startPositionSeconds = 0,
   onProgress,
   onVideoElement,
@@ -129,6 +134,23 @@ export function MasterPlayer({
   const [autoSkip, setAutoSkip] = useState(readAutoSkip);
   const [showStats, setShowStats] = useState(false);
   const [stats, setStats] = useState<PlaybackStats | null>(null);
+
+  // QoE only recomputes while the stats overlay is open; the event log is
+  // always recorded, because a session's start time cannot be reconstructed
+  // after the fact.
+  const qoe = useQoeSession(showStats);
+  const sessionIdRef = useRef(qoe.sessionId);
+  sessionIdRef.current = qoe.sessionId;
+  const recordQoe = qoe.record;
+  const cmcdContentId = contentId ?? episodeLabel;
+
+  // Read through refs inside the hls setup effect: neither value should tear
+  // down and rebuild the media pipeline, and a changed content id means a new
+  // episode, which remounts anyway.
+  const contentIdRef = useRef(cmcdContentId);
+  contentIdRef.current = cmcdContentId;
+  const recordQoeRef = useRef(recordQoe);
+  recordQoeRef.current = recordQoe;
 
   // Read through a ref so changing the resume point never restarts the race.
   const startPositionRef = useRef(startPositionSeconds);
@@ -267,6 +289,46 @@ export function MasterPlayer({
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [video]);
+
+  // QoE lifecycle. These are recorded unconditionally: a session's start time
+  // and rebuffer history cannot be reconstructed after the fact, so sampling
+  // only when the overlay is open would mean never having the data when it
+  // matters.
+  useEffect(() => {
+    if (!video) return;
+
+    let started = false;
+    const mark = (type: Parameters<typeof recordQoe>[0]['type']) => recordQoe({ type, at: Date.now() });
+
+    const onPlay = () => mark('play-intent');
+    const onPlaying = () => {
+      if (!started) {
+        started = true;
+        mark('first-frame');
+      } else {
+        // `playing` after a stall is the resume; hls.js does not distinguish
+        // these, so the first-frame flag is what separates start from recovery.
+        mark('rebuffer-end');
+      }
+    };
+    const onWaiting = () => mark('rebuffer-start');
+    const onPause = () => mark('pause');
+    const onEnded = () => mark('end');
+
+    video.addEventListener('play', onPlay);
+    video.addEventListener('playing', onPlaying);
+    video.addEventListener('waiting', onWaiting);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('ended', onEnded);
+
+    return () => {
+      video.removeEventListener('play', onPlay);
+      video.removeEventListener('playing', onPlaying);
+      video.removeEventListener('waiting', onWaiting);
+      video.removeEventListener('pause', onPause);
+      video.removeEventListener('ended', onEnded);
+    };
+  }, [recordQoe, video]);
 
   // Sample playback telemetry while the stats overlay is open. Polling only
   // while visible keeps this off the hot path when nobody is looking.
@@ -467,12 +529,29 @@ export function MasterPlayer({
             errorRetry: { maxNumRetry: 3, retryDelayMs: 800, maxRetryDelayMs: 8_000 },
           },
         },
+        // CTA-5004 CMCD. Query mode rather than headers on purpose: a custom
+        // header triggers a CORS preflight per unique URL, which would double
+        // the request count against every segment. The spec says as much.
+        cmcd: {
+          sessionId: sessionIdRef.current,
+          contentId: contentIdRef.current,
+          useHeaders: false,
+        },
       });
       hlsRef.current = hls;
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setLevels(hls.levels.map(describeLevel));
         setCurrentLevel(hls.currentLevel);
+      });
+
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+        const level = hls.levels[data.level];
+        if (level?.bitrate) {
+          recordQoeRef.current({
+            type: 'bitrate-change', at: Date.now(), bitrateKbps: Math.round(level.bitrate / 1000),
+          });
+        }
       });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => setCurrentLevel(data.level));
       hls.on(Hls.Events.ERROR, (_event, data: ErrorData) => {
@@ -678,6 +757,13 @@ export function MasterPlayer({
               <div><dt>Buffer ahead</dt><dd>{stats.bufferAheadSeconds.toFixed(1)} s</dd></div>
               <div><dt>Dropped frames</dt><dd>{stats.droppedFrames ?? '—'}</dd></div>
               <div><dt>Renditions</dt><dd>{stats.levelCount || '—'}</dd></div>
+              {qoe.metrics ? (
+                <>
+                  <div><dt>Start time</dt><dd>{qoe.metrics.videoStartTimeMs != null ? `${qoe.metrics.videoStartTimeMs} ms` : '—'}</dd></div>
+                  <div><dt>Rebuffers</dt><dd>{qoe.metrics.rebufferCount} · {(qoe.metrics.rebufferRatio * 100).toFixed(2)}%</dd></div>
+                  <div><dt>QoE</dt><dd>{qoe.metrics.score} · {describeQoe(qoe.metrics)}</dd></div>
+                </>
+              ) : null}
             </dl>
           </div>
         ) : null}

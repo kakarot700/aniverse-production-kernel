@@ -272,6 +272,7 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
             loading={sourcesLoading}
             requestedMirrorIndex={requestedMirrorIndex}
             skipTimestamps={skipTimestamps ?? undefined}
+            contentId={`${summary.id}:${episodeNumber}`}
             startPositionSeconds={resumeSeconds}
             onProgress={handleProgress}
             onVideoElement={handleVideoElement}

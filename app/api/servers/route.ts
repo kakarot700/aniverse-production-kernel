@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { describeServers, getRegistry } from '@/lib/streams/registry';
+import { snapshotControlPlane, toSteerableMirrors } from '@/lib/streams/control-plane';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const registry = getRegistry();
   const servers = describeServers();
+  const controlPlane = snapshotControlPlane(toSteerableMirrors(registry.servers));
 
   return NextResponse.json(
     {
@@ -25,6 +27,7 @@ export async function GET() {
         reference: servers.filter((server) => server.isReference).length,
         groups: [...new Set(servers.map((server) => server.group))],
       },
+      controlPlane,
       config: {
         loadedFrom: registry.loadedFrom,
         configuredCount: registry.configuredCount,

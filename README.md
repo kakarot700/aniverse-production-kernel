@@ -42,6 +42,8 @@ The slot activates on restart; no player code change is required.
 | Skip intro/outro | AniSkip crowd timestamps, with an auto-skip toggle. |
 | Recommendations | A taste profile scored from local history — genre, studio and recency weighted. Nothing leaves the browser. |
 | Player | Keyboard shortcuts, picture-in-picture, persisted volume, live playback-statistics overlay, next-episode prefetch. |
+| Control plane | CMCD (CTA-5004) telemetry in, HLS Content Steering (RFC 8216bis §7) out. Viewer-reported distress reroutes every client mid-playback. |
+| QoE | Standard session metrics — start time, rebuffering ratio, EBVS/VSF — scored 0–100. |
 
 **Adding your own servers: [`docs/ADDING-SERVERS.md`](docs/ADDING-SERVERS.md).**
 
@@ -49,6 +51,7 @@ Deeper notes: [`docs/ANIME-SOURCES.md`](docs/ANIME-SOURCES.md),
 [`docs/STREAM-SERVERS.md`](docs/STREAM-SERVERS.md),
 [`docs/FAILOVER.md`](docs/FAILOVER.md),
 [`docs/ADVANCED-FEATURES.md`](docs/ADVANCED-FEATURES.md),
+[`docs/CONTROL-PLANE.md`](docs/CONTROL-PLANE.md),
 [`docs/STREAM-SERVER-RESEARCH.md`](docs/STREAM-SERVER-RESEARCH.md),
 [`docs/ROOM-SYNC.md`](docs/ROOM-SYNC.md), and
 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
@@ -70,6 +73,8 @@ GET /api/anime/:id                    # anilist:<n> | mal:<n> | <n> | offline:<s
 GET /api/watch/:id/:episode           # ranked stream servers for one episode
 GET /api/servers                      # registry state + config diagnostics
 GET /api/skip/:malId/:episode?length= # AniSkip opening/ending timestamps
+GET  /api/steering                    # HLS Content Steering manifest
+POST /api/steering                    # CMCD telemetry ingest
 GET|HEAD /api/proxy?url=<https url>   # same-origin media gateway
 ```
 
