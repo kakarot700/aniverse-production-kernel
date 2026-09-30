@@ -23,9 +23,10 @@
 
 ## Stream servers
 
-- Configure `ANIVERSE_STREAM_SERVERS` (or `ANIVERSE_STREAM_SERVERS_FILE`) with
-  origins you own, operate or are licensed to distribute from. See
-  `docs/STREAM-SERVERS.md`.
+- Configure one or more `ANIVERSE_SERVER_01_URL` …
+  `ANIVERSE_SERVER_12_URL` quick slots, `ANIVERSE_STREAM_SERVERS`, or
+  `ANIVERSE_STREAM_SERVERS_FILE` with origins you own, operate or are licensed
+  to distribute from. See `docs/STREAM-SERVERS.md`.
 - Set `ANIVERSE_ENABLE_REFERENCE_STREAMS=false` once real servers exist so the
   public test streams stop appearing in the server rail.
 - Verify with `GET /api/servers`: `config.issues` must be empty and

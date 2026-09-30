@@ -350,8 +350,8 @@ export function MasterPlayer({
             <div>
               <strong>{fatalError}</strong>
               <p>
-                Pick a different server below, or configure your own in <code>ANIVERSE_STREAM_SERVERS</code> so this
-                title resolves to a source you are licensed to stream.
+                Pick a different server below, or add a licensed URL in an <code>ANIVERSE_SERVER_XX_URL</code> slot so
+                this title resolves to media you are allowed to stream.
               </p>
             </div>
           </div>

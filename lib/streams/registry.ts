@@ -9,7 +9,9 @@
  * Configuration precedence:
  *  1. `ANIVERSE_STREAM_SERVERS`      – JSON array of server definitions
  *  2. `ANIVERSE_STREAM_SERVERS_FILE` – path to a JSON file with the same shape
- *  3. built-in public reference streams (unless disabled)
+ *  3. `config/stream-servers.json`   – auto-discovered local file
+ *  4. `ANIVERSE_SERVER_01_URL` … `ANIVERSE_SERVER_12_URL` quick slots
+ *  5. built-in public reference streams (unless disabled)
  */
 import type { AnimeDetail, AnimeSummary } from '@/types/anime';
 import type { StreamMirrorNode } from '@/types/media';
@@ -23,14 +25,25 @@ import {
   type TitleTokens,
 } from './definitions';
 
+export type RegistryConfigSource =
+  | 'env'
+  | 'file'
+  | 'quick-env'
+  | 'env+quick-env'
+  | 'file+quick-env'
+  | 'none';
+
 export interface RegistrySnapshot {
   servers: StreamServerDefinition[];
   issues: DefinitionIssue[];
   referenceStreamsEnabled: boolean;
   configuredCount: number;
   allowedHosts: string[];
-  loadedFrom: 'env' | 'file' | 'none';
+  loadedFrom: RegistryConfigSource;
 }
+
+export const QUICK_SERVER_SLOT_COUNT = 12;
+export const DEFAULT_SERVER_CONFIG_FILE = './config/stream-servers.json';
 
 let snapshot: RegistrySnapshot | null = null;
 
@@ -45,9 +58,45 @@ function readFileConfig(path: string): { value: unknown; error?: string } {
   }
 }
 
+function fileExists(path: string): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('node:fs') as typeof import('node:fs');
+    return fs.existsSync(path);
+  } catch {
+    return false;
+  }
+}
+
 function booleanEnv(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined) return fallback;
   return !/^(0|false|no|off)$/i.test(value.trim());
+}
+
+function quickSlotKey(index: number): string {
+  return `ANIVERSE_SERVER_${String(index).padStart(2, '0')}_URL`;
+}
+
+function quickServerRecords(): Array<Record<string, unknown>> {
+  const records: Array<Record<string, unknown>> = [];
+  for (let index = 1; index <= QUICK_SERVER_SLOT_COUNT; index += 1) {
+    const template = process.env[quickSlotKey(index)]?.trim() ?? '';
+    if (!template) continue;
+    const slot = String(index).padStart(2, '0');
+    records.push({
+      id: `anime-server-${slot}`,
+      name: `Anime Server ${slot}`,
+      group: 'Licensed',
+      language: 'mixed',
+      kind: /\.mp4(?:$|[?#])/i.test(template) ? 'mp4' : 'hls',
+      priority: index * 10,
+      requiresProxy: true,
+      scope: 'universal',
+      template,
+      note: `Configured by ${quickSlotKey(index)}.`,
+    });
+  }
+  return records;
 }
 
 export function parseAllowedHostList(value: string | undefined): string[] {
@@ -61,10 +110,11 @@ export function parseAllowedHostList(value: string | undefined): string[] {
 function buildSnapshot(): RegistrySnapshot {
   const issues: DefinitionIssue[] = [];
   let configured: StreamServerDefinition[] = [];
-  let loadedFrom: RegistrySnapshot['loadedFrom'] = 'none';
+  let loadedFrom: RegistryConfigSource = 'none';
 
   const inlineJson = process.env.ANIVERSE_STREAM_SERVERS?.trim();
-  const filePath = process.env.ANIVERSE_STREAM_SERVERS_FILE?.trim();
+  const explicitFilePath = process.env.ANIVERSE_STREAM_SERVERS_FILE?.trim();
+  const filePath = explicitFilePath || (fileExists(DEFAULT_SERVER_CONFIG_FILE) ? DEFAULT_SERVER_CONFIG_FILE : '');
 
   if (inlineJson) {
     try {
@@ -82,7 +132,11 @@ function buildSnapshot(): RegistrySnapshot {
   } else if (filePath) {
     const file = readFileConfig(filePath);
     if (file.error) {
-      issues.push({ index: -1, id: '', message: `ANIVERSE_STREAM_SERVERS_FILE could not be read: ${file.error}` });
+      issues.push({
+        index: -1,
+        id: '',
+        message: `${explicitFilePath ? 'ANIVERSE_STREAM_SERVERS_FILE' : DEFAULT_SERVER_CONFIG_FILE} could not be read: ${file.error}`,
+      });
     } else {
       const parsed = parseServerDefinitions(file.value);
       configured = parsed.servers;
@@ -90,6 +144,31 @@ function buildSnapshot(): RegistrySnapshot {
       loadedFrom = 'file';
     }
   }
+
+  const quick = parseServerDefinitions(quickServerRecords());
+  issues.push(...quick.issues);
+  if (quick.servers.length > 0) {
+    const existingIds = new Set(configured.map((server) => server.id));
+    for (const server of quick.servers) {
+      if (existingIds.has(server.id)) {
+        issues.push({
+          index: -1,
+          id: server.id,
+          message: `${quickSlotKey(Number.parseInt(server.id.slice(-2), 10))} was ignored because detailed configuration already uses this id.`,
+        });
+        continue;
+      }
+      configured.push(server);
+      existingIds.add(server.id);
+    }
+    loadedFrom = loadedFrom === 'env'
+      ? 'env+quick-env'
+      : loadedFrom === 'file'
+        ? 'file+quick-env'
+        : 'quick-env';
+  }
+
+  configured.sort((left, right) => left.priority - right.priority);
 
   const referenceStreamsEnabled = booleanEnv(
     process.env.ANIVERSE_ENABLE_REFERENCE_STREAMS,
@@ -174,23 +253,34 @@ export interface PublicServerInfo {
   quality: string | null;
   note: string | null;
   mappedTitles: number;
+  mappedEpisodes: number;
 }
 
 /** Registry view safe to expose over HTTP: no URL templates, no secrets. */
 export function describeServers(): PublicServerInfo[] {
-  return getRegistry().servers.map((definition) => ({
-    id: definition.id,
-    name: definition.name,
-    group: definition.group,
-    language: definition.language,
-    kind: definition.kind,
-    priority: definition.priority,
-    requiresProxy: definition.requiresProxy,
-    scope: definition.scope,
-    enabled: definition.enabled,
-    isReference: definition.isReference,
-    quality: definition.quality ?? null,
-    note: definition.note ?? null,
-    mappedTitles: definition.titles ? Object.keys(definition.titles).length : 0,
-  }));
+  return getRegistry().servers.map((definition) => {
+    const mappedTitleKeys = new Set([
+      ...Object.keys(definition.titles ?? {}),
+      ...Object.keys(definition.episodes ?? {}),
+    ]);
+    const mappedEpisodes = Object.values(definition.episodes ?? {})
+      .reduce((total, entries) => total + Object.keys(entries).length, 0);
+
+    return {
+      id: definition.id,
+      name: definition.name,
+      group: definition.group,
+      language: definition.language,
+      kind: definition.kind,
+      priority: definition.priority,
+      requiresProxy: definition.requiresProxy,
+      scope: definition.scope,
+      enabled: definition.enabled,
+      isReference: definition.isReference,
+      quality: definition.quality ?? null,
+      note: definition.note ?? null,
+      mappedTitles: mappedTitleKeys.size,
+      mappedEpisodes,
+    };
+  });
 }
