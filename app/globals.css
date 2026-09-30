@@ -767,3 +767,157 @@ main { width: min(calc(100% - 48px), var(--content-width)); margin: 0 auto; }
   .servers-table th:nth-child(4), .servers-table td:nth-child(4),
   .servers-table th:nth-child(5), .servers-table td:nth-child(5) { display: none; }
 }
+
+/* ─── Library shelves: continue watching and saved list ───────────────── */
+
+.shelf {
+  width: min(100% - 40px, var(--content-width));
+  margin: 0 auto 38px;
+}
+.shelf-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.shelf-head h2 { margin: 4px 0 0; font-size: clamp(1.32rem, 2.4vw, 1.72rem); letter-spacing: -0.015em; }
+.shelf-count { color: var(--muted); font-size: 0.82rem; }
+
+.shelf-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(148px, 1fr);
+  gap: 16px;
+  margin: 0;
+  padding: 4px 4px 14px;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.shelf-item { position: relative; scroll-snap-align: start; }
+
+.shelf-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.shelf-art {
+  position: relative;
+  display: block;
+  aspect-ratio: 2 / 3;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(120, 124, 140, 0.12);
+  box-shadow: var(--shadow-soft);
+  transition: transform 180ms ease;
+}
+.shelf-card:hover .shelf-art { transform: translateY(-3px); }
+.shelf-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.shelf-play {
+  position: absolute;
+  inset: auto 10px 10px auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--accent-strong);
+  font-size: 0.7rem;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.shelf-card:hover .shelf-play, .shelf-card:focus-visible .shelf-play { opacity: 1; }
+
+.shelf-progress {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 4px;
+  background: rgba(30, 30, 40, 0.34);
+}
+.shelf-progress > span { display: block; height: 100%; background: var(--accent); }
+
+.shelf-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.32;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.shelf-sub { color: var(--muted); font-size: 0.76rem; }
+
+.shelf-dismiss {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(20, 20, 28, 0.56);
+  color: white;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.shelf-item:hover .shelf-dismiss, .shelf-dismiss:focus-visible { opacity: 1; }
+
+@media (max-width: 720px) {
+  .shelf { width: min(100% - 26px, var(--content-width)); }
+  .shelf-row { grid-auto-columns: minmax(124px, 1fr); }
+}
+
+/* ─── Player toolbar additions ────────────────────────────────────────── */
+
+.modal-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.modal-actions .button-quiet { min-height: 36px; padding: 0 14px; font-size: 0.8rem; white-space: nowrap; }
+.modal-actions .button-quiet.is-saved { background: var(--lavender); color: var(--accent-strong); border-color: transparent; }
+
+.player-tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.player-tool { min-height: 32px; padding: 0 12px; font-size: 0.76rem; }
+.player-resume { color: var(--accent-strong); font-size: 0.79rem; }
+
+.shortcut-help { position: relative; font-size: 0.76rem; }
+.shortcut-help > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.53);
+  color: #565a65;
+  user-select: none;
+}
+.shortcut-help > summary::-webkit-details-marker { display: none; }
+.shortcut-help[open] > summary { background: white; }
+.shortcut-help > dl {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 5;
+  width: max-content;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  box-shadow: var(--shadow-soft);
+}
+.shortcut-help > dl > div { display: flex; gap: 14px; justify-content: space-between; padding: 3px 0; }
+.shortcut-help dt { font-weight: 600; }
+.shortcut-help dd { margin: 0; color: var(--muted); }

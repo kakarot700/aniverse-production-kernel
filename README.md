@@ -38,6 +38,9 @@ The slot activates on restart; no player code change is required.
 | Playback | Ranked mirror list per episode, off-main-thread **hedged parallel racing** with a health-aware circuit breaker, hls.js with network/media error recovery, position-preserving failover, manual server switching, quality selection. |
 | Media proxy | Same-origin HLS gateway with a derived host allowlist, per-hop redirect re-checks, manifest rewriting, range and content-encoding correctness. |
 | Watch rooms | Private Supabase Broadcast channels, four-timestamp clock sync, drift correction. |
+| Your library | Continue-watching with per-episode resume and a saved list. Local-first: works with no account, no Supabase, no network. |
+
+**Adding your own servers: [`docs/ADDING-SERVERS.md`](docs/ADDING-SERVERS.md).**
 
 Deeper notes: [`docs/ANIME-SOURCES.md`](docs/ANIME-SOURCES.md),
 [`docs/STREAM-SERVERS.md`](docs/STREAM-SERVERS.md),

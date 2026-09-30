@@ -6,8 +6,12 @@ import { MasterPlayer } from '@/components/MasterPlayer';
 import { ServerRail } from '@/components/ServerRail';
 import { WatchRoomPanel } from '@/components/WatchRoomPanel';
 import { useAnimeDetail, useWatchSources } from '@/hooks/useAnimeData';
+import { useLibrary } from '@/hooks/useLibrary';
 import { describeRuntime, formatLabel, titleCase } from '@/lib/anime/text';
 import type { AnimeSummary } from '@/types/anime';
+
+/** Writing to storage on every timeupdate is wasteful; 5 s is plenty. */
+const PROGRESS_SAVE_INTERVAL_MS = 5_000;
 
 interface TitleDialogProps {
   summary: AnimeSummary;
@@ -33,13 +37,29 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
   const [requestedMirrorIndex, setRequestedMirrorIndex] = useState<number | null>(null);
   const [activeMirrorIndex, setActiveMirrorIndex] = useState<number | null>(null);
 
+  const [resumeSeconds, setResumeSeconds] = useState(0);
+
   const { detail, loading: detailLoading } = useAnimeDetail(summary.id, summary);
   const record = detail ?? null;
   const { payload, loading: sourcesLoading, error: sourcesError } = useWatchSources(record ?? summary, episodeNumber);
 
+  const library = useLibrary();
+  // Read the library through a ref inside effects: its callbacks change
+  // identity whenever stored state changes, and depending on them directly
+  // would re-run the resume logic on every progress save.
+  const libraryRef = useRef(library);
+  libraryRef.current = library;
+
   const mirrors = useMemo(() => payload?.mirrors ?? [], [payload]);
   const episodes = record?.episodes ?? [];
   const activeEpisode = episodes.find((episode) => episode.number === episodeNumber) ?? null;
+  const episodeCount = record?.episodes.length || record?.episodeCount || summary.episodeCount || null;
+  const isSaved = library.isSaved(summary.id);
+
+  const openedTitleRef = useRef('');
+  const resumeKeyRef = useRef('');
+  const lastSaveAtRef = useRef(0);
+  const lastKnownRef = useRef({ positionMs: 0, durationMs: 0, episodeNumber: 1 });
 
   useEffect(() => {
     setEpisodeNumber(1);
@@ -50,6 +70,25 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
   useEffect(() => {
     setRequestedMirrorIndex(null);
   }, [episodeNumber]);
+
+  // Open on the episode the viewer was last on, once storage has been read.
+  useEffect(() => {
+    if (!library.ready) return;
+    if (openedTitleRef.current === summary.id) return;
+    openedTitleRef.current = summary.id;
+    const entry = libraryRef.current.continueRow.find((item) => item.mediaId === summary.id);
+    if (entry) setEpisodeNumber(entry.episodeNumber);
+  }, [library.ready, summary.id]);
+
+  // Resolve the resume point once per episode, never mid-playback — otherwise
+  // a manual scrub would be yanked back to the stored position.
+  useEffect(() => {
+    if (!library.ready) return;
+    const key = `${summary.id}::${episodeNumber}`;
+    if (resumeKeyRef.current === key) return;
+    resumeKeyRef.current = key;
+    setResumeSeconds(libraryRef.current.resumeFor(summary.id, episodeNumber) / 1000);
+  }, [library.ready, summary.id, episodeNumber]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -71,7 +110,56 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
     onClose();
   };
 
-  const handleProgress = useCallback((next: number) => setPositionMs(next), []);
+  const titleForLibrary = record?.title ?? summary.title;
+  const coverForLibrary = record?.coverImage ?? summary.coverImage;
+
+  const handleProgress = useCallback(
+    (next: number, durationMs: number) => {
+      setPositionMs(next);
+      lastKnownRef.current = { positionMs: next, durationMs, episodeNumber };
+
+      const now = Date.now();
+      if (now - lastSaveAtRef.current < PROGRESS_SAVE_INTERVAL_MS) return;
+      lastSaveAtRef.current = now;
+      libraryRef.current.saveProgress({
+        mediaId: summary.id,
+        episodeNumber,
+        positionMs: next,
+        durationMs,
+        title: titleForLibrary,
+        coverImage: coverForLibrary,
+        episodeCount,
+      });
+    },
+    [coverForLibrary, episodeCount, episodeNumber, summary.id, titleForLibrary],
+  );
+
+  // Closing the dialog (or switching episode) must not lose the last few
+  // seconds of progress that the throttle was still holding.
+  useEffect(() => {
+    return () => {
+      const last = lastKnownRef.current;
+      if (last.positionMs <= 0) return;
+      libraryRef.current.saveProgress({
+        mediaId: summary.id,
+        episodeNumber: last.episodeNumber,
+        positionMs: last.positionMs,
+        durationMs: last.durationMs,
+        title: titleForLibrary,
+        coverImage: coverForLibrary,
+        episodeCount,
+      });
+    };
+  }, [coverForLibrary, episodeCount, summary.id, titleForLibrary]);
+
+  const handleToggleSaved = useCallback(() => {
+    libraryRef.current.toggleSaved({
+      mediaId: summary.id,
+      title: titleForLibrary,
+      coverImage: coverForLibrary,
+    });
+  }, [coverForLibrary, summary.id, titleForLibrary]);
+
   const handleVideoElement = useCallback((element: HTMLVideoElement | null) => setVideoElement(element), []);
   const handleActiveMirror = useCallback((index: number | null) => setActiveMirrorIndex(index), []);
 
@@ -108,9 +196,19 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
           <p className="modal-synopsis">{record?.synopsis ?? summary.synopsis}</p>
           {record?.titles.native ? <p className="modal-native">{record.titles.native}</p> : null}
         </div>
-        <button ref={closeButtonRef} className="icon-button" type="button" aria-label="Close player" onClick={onClose}>
-          ×
-        </button>
+        <div className="modal-actions">
+          <button
+            type="button"
+            className={isSaved ? 'button-quiet is-saved' : 'button-quiet'}
+            aria-pressed={isSaved}
+            onClick={handleToggleSaved}
+          >
+            <span aria-hidden="true">{isSaved ? '★' : '☆'}</span> {isSaved ? 'In your list' : 'Add to list'}
+          </button>
+          <button ref={closeButtonRef} className="icon-button" type="button" aria-label="Close player" onClick={onClose}>
+            ×
+          </button>
+        </div>
       </div>
 
       <div className="player-layout">
@@ -121,12 +219,16 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
             episodeLabel={episodeLabel}
             loading={sourcesLoading}
             requestedMirrorIndex={requestedMirrorIndex}
+            startPositionSeconds={resumeSeconds}
             onProgress={handleProgress}
             onVideoElement={handleVideoElement}
             onActiveMirrorChange={handleActiveMirror}
           />
           <div className="player-subline">
             <span className="player-position">Playhead {formatPlaybackPosition(positionMs)}</span>
+            {resumeSeconds > 0 ? (
+              <span className="player-resume">Resuming from {formatPlaybackPosition(resumeSeconds * 1000)}</span>
+            ) : null}
             <span className="player-episode">
               {activeEpisode ? `Ep ${activeEpisode.number} · ${activeEpisode.title}` : `Episode ${episodeNumber}`}
             </span>

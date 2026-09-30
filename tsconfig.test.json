@@ -23,6 +23,7 @@
     "lib/streams/definitions.ts",
     "lib/streams/registry.ts",
     "lib/streams/health.ts",
+    "lib/user-data/library.ts",
     "lib/anime/text.ts",
     "lib/anime/cache.ts",
     "lib/anime/offline.ts",

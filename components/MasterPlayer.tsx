@@ -14,7 +14,9 @@ interface MasterPlayerProps {
   loading?: boolean;
   /** Index into `mirrors` the viewer explicitly picked, or null for automatic. */
   requestedMirrorIndex?: number | null;
-  onProgress?: (positionMs: number) => void;
+  /** Seconds to resume from on first play, from the continue-watching library. */
+  startPositionSeconds?: number;
+  onProgress?: (positionMs: number, durationMs: number) => void;
   onVideoElement?: (element: HTMLVideoElement | null) => void;
   onActiveMirrorChange?: (index: number | null) => void;
 }
@@ -32,6 +34,7 @@ const MAX_MEDIA_RECOVERIES = 2;
  * The worker still overrides this if that server is in its cooldown window.
  */
 const PREFERRED_SERVER_KEY = 'aniverse:preferred-server';
+const VOLUME_KEY = 'aniverse:volume';
 
 function readPreferredServerId(): string | null {
   try {
@@ -50,6 +53,27 @@ function writePreferredServerId(id: string): void {
   }
 }
 
+/** Volume and mute survive episode changes and reloads, like any real player. */
+function readStoredVolume(): { volume: number; muted: boolean } | null {
+  try {
+    const raw = window.localStorage.getItem(VOLUME_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { volume?: unknown; muted?: unknown };
+    const volume = typeof parsed.volume === 'number' && parsed.volume >= 0 && parsed.volume <= 1 ? parsed.volume : 1;
+    return { volume, muted: parsed.muted === true };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredVolume(volume: number, muted: boolean): void {
+  try {
+    window.localStorage.setItem(VOLUME_KEY, JSON.stringify({ volume, muted }));
+  } catch {
+    // Non-fatal.
+  }
+}
+
 function describeLevel(level: Level, index: number): QualityLevel {
   const height = level.height ? `${level.height}p` : `${Math.round((level.bitrate ?? 0) / 1000)} kbps`;
   return { index, label: height };
@@ -62,6 +86,7 @@ export function MasterPlayer({
   skipTimestamps,
   loading = false,
   requestedMirrorIndex = null,
+  startPositionSeconds = 0,
   onProgress,
   onVideoElement,
   onActiveMirrorChange,
@@ -72,6 +97,11 @@ export function MasterPlayer({
   const [levels, setLevels] = useState<QualityLevel[]>([]);
   const [currentLevel, setCurrentLevel] = useState(-1);
   const [skipHint, setSkipHint] = useState<'intro' | 'outro' | null>(null);
+  const [pipAvailable, setPipAvailable] = useState(false);
+
+  // Read through a ref so changing the resume point never restarts the race.
+  const startPositionRef = useRef(startPositionSeconds);
+  startPositionRef.current = startPositionSeconds;
 
   const mirrorsRef = useRef(mirrors);
   mirrorsRef.current = mirrors;
@@ -96,6 +126,120 @@ export function MasterPlayer({
     onVideoElement?.(video);
     return () => onVideoElement?.(null);
   }, [onVideoElement, video]);
+
+  // Restore the viewer's volume, then keep it in sync.
+  useEffect(() => {
+    if (!video) return;
+    const stored = readStoredVolume();
+    if (stored) {
+      video.volume = stored.volume;
+      video.muted = stored.muted;
+    }
+    setPipAvailable(
+      typeof document !== 'undefined' &&
+        'pictureInPictureEnabled' in document &&
+        document.pictureInPictureEnabled,
+    );
+
+    const persist = () => writeStoredVolume(video.volume, video.muted);
+    video.addEventListener('volumechange', persist);
+    return () => video.removeEventListener('volumechange', persist);
+  }, [video]);
+
+  // Keyboard shortcuts. The player lives inside a modal dialog, so listening
+  // on the document is safe, but typing in the search box or a room field must
+  // never scrub the video.
+  useEffect(() => {
+    if (!video) return;
+
+    const isTypingTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      if (target.isContentEditable) return true;
+      return ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName);
+    };
+
+    const nudge = (seconds: number) => {
+      const duration = Number.isFinite(video.duration) ? video.duration : Number.POSITIVE_INFINITY;
+      video.currentTime = Math.min(Math.max(0, video.currentTime + seconds), duration);
+    };
+
+    const setVolume = (delta: number) => {
+      video.volume = Math.min(1, Math.max(0, video.volume + delta));
+      if (video.volume > 0) video.muted = false;
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isTypingTarget(event.target)) return;
+
+      switch (event.key) {
+        case ' ':
+        case 'k':
+        case 'K':
+          event.preventDefault();
+          if (video.paused) void video.play().catch(() => undefined);
+          else video.pause();
+          return;
+        case 'ArrowLeft':
+          event.preventDefault();
+          nudge(-5);
+          return;
+        case 'ArrowRight':
+          event.preventDefault();
+          nudge(5);
+          return;
+        case 'j':
+        case 'J':
+          event.preventDefault();
+          nudge(-10);
+          return;
+        case 'l':
+        case 'L':
+          event.preventDefault();
+          nudge(10);
+          return;
+        case 'ArrowUp':
+          event.preventDefault();
+          setVolume(0.05);
+          return;
+        case 'ArrowDown':
+          event.preventDefault();
+          setVolume(-0.05);
+          return;
+        case 'm':
+        case 'M':
+          event.preventDefault();
+          video.muted = !video.muted;
+          return;
+        case 'f':
+        case 'F':
+          event.preventDefault();
+          if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+          else void video.requestFullscreen?.().catch(() => undefined);
+          return;
+        default:
+          break;
+      }
+
+      // 0–9 jump to that tenth of the episode.
+      if (/^[0-9]$/.test(event.key) && Number.isFinite(video.duration) && video.duration > 0) {
+        event.preventDefault();
+        video.currentTime = (Number(event.key) / 10) * video.duration;
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [video]);
+
+  const togglePictureInPicture = useCallback(() => {
+    if (!video) return;
+    if (document.pictureInPictureElement) {
+      void document.exitPictureInPicture().catch(() => undefined);
+      return;
+    }
+    void video.requestPictureInPicture?.().catch(() => undefined);
+  }, [video]);
 
   // Viewer-selected server.
   useEffect(() => {
@@ -147,9 +291,10 @@ export function MasterPlayer({
     let lastProgressAt = 0;
     let lastSkipPoint: 'intro' | 'outro' | '' = '';
     let disposed = false;
-    // Where to pick playback back up after a mid-episode server switch, so a
-    // failover costs a buffering pause rather than restarting the episode.
-    let resumeAtSeconds = 0;
+    // Where to pick playback back up: the continue-watching position on the
+    // first attach, and after that the playhead captured before a mid-episode
+    // server switch — so a failover costs a buffering pause, not a restart.
+    let resumeAtSeconds = startPositionRef.current > 0 ? startPositionRef.current : 0;
     let pendingSeek: (() => void) | null = null;
 
     const send = (message: WorkerRequest) => {
@@ -329,7 +474,11 @@ export function MasterPlayer({
       const now = performance.now();
       if (now - lastProgressAt > 400) {
         lastProgressAt = now;
-        callbacksRef.current.onProgress?.(Math.max(0, Math.floor(video.currentTime * 1000)));
+        const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+        callbacksRef.current.onProgress?.(
+          Math.max(0, Math.floor(video.currentTime * 1000)),
+          Math.floor(duration * 1000),
+        );
       }
 
       const skip = skipRef.current;
@@ -433,19 +582,43 @@ export function MasterPlayer({
         <p className="player-status" aria-live="polite">
           {status}
         </p>
-        {levels.length > 1 ? (
-          <label className="quality-select">
-            <span className="sr-only">Video quality</span>
-            <select value={currentLevel} onChange={(event) => changeLevel(Number(event.target.value))}>
-              <option value={-1}>Auto</option>
-              {levels.map((level) => (
-                <option key={level.index} value={level.index}>
-                  {level.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
+        <div className="player-tools">
+          {levels.length > 1 ? (
+            <label className="quality-select">
+              <span className="sr-only">Video quality</span>
+              <select value={currentLevel} onChange={(event) => changeLevel(Number(event.target.value))}>
+                <option value={-1}>Auto</option>
+                {levels.map((level) => (
+                  <option key={level.index} value={level.index}>
+                    {level.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {pipAvailable ? (
+            <button
+              type="button"
+              className="button-quiet player-tool"
+              onClick={togglePictureInPicture}
+              title="Picture in picture (p)"
+            >
+              Pop out
+            </button>
+          ) : null}
+          <details className="shortcut-help">
+            <summary title="Keyboard shortcuts">Keys</summary>
+            <dl>
+              <div><dt>Space / K</dt><dd>Play or pause</dd></div>
+              <div><dt>← / →</dt><dd>Back or forward 5s</dd></div>
+              <div><dt>J / L</dt><dd>Back or forward 10s</dd></div>
+              <div><dt>↑ / ↓</dt><dd>Volume</dd></div>
+              <div><dt>M</dt><dd>Mute</dd></div>
+              <div><dt>F</dt><dd>Fullscreen</dd></div>
+              <div><dt>0–9</dt><dd>Jump to that tenth</dd></div>
+            </dl>
+          </details>
+        </div>
       </div>
     </>
   );

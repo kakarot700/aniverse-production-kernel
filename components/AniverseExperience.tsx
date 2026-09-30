@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CatalogCard } from '@/components/CatalogCard';
+import { ContinueShelf, WatchlistShelf } from '@/components/LibraryShelf';
 import { TitleDialog } from '@/components/TitleDialog';
 import { useCatalog, useDebouncedValue } from '@/hooks/useAnimeData';
+import { useLibrary } from '@/hooks/useLibrary';
 import { describeRuntime, formatLabel } from '@/lib/anime/text';
 import {
   ANIME_FORMATS,
@@ -41,6 +43,7 @@ export function AniverseExperience({ initialPage, currentSeason }: AniverseExper
   const [selected, setSelected] = useState<AnimeSummary | null>(null);
   const roomHandledRef = useRef(false);
 
+  const library = useLibrary();
   const search = useDebouncedValue(searchInput.trim(), 350);
   const effectiveMode: CatalogMode = search ? 'search' : mode;
   const isPristine =
@@ -147,6 +150,15 @@ export function AniverseExperience({ initialPage, currentSeason }: AniverseExper
             <div className="hero-art hero-art-skeleton" aria-hidden="true" />
           )}
         </section>
+
+        {/* Personal rows sit above the catalog, but only on the unfiltered
+            view — they are noise in the middle of a search. */}
+        {!search ? (
+          <>
+            <ContinueShelf items={library.continueRow} onOpen={setSelected} onForget={library.forget} />
+            <WatchlistShelf items={library.watchlist} onOpen={setSelected} />
+          </>
+        ) : null}
 
         <section id="collection" className="collection" aria-labelledby="collection-title">
           <div className="collection-head">
