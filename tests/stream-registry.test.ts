@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
-  DEFAULT_SERVERS_FILE,
+  DEFAULT_SERVER_CONFIG_FILE,
   describeServers,
   getAllowedMediaHosts,
   getEpisodeMirrors,
@@ -23,6 +23,18 @@ const ENV_KEYS = [
   'ANIVERSE_STREAM_SERVERS_FILE',
   'ANIVERSE_ENABLE_REFERENCE_STREAMS',
   'ANIVERSE_MEDIA_ALLOWED_HOSTS',
+  'ANIVERSE_SERVER_01_URL',
+  'ANIVERSE_SERVER_02_URL',
+  'ANIVERSE_SERVER_03_URL',
+  'ANIVERSE_SERVER_04_URL',
+  'ANIVERSE_SERVER_05_URL',
+  'ANIVERSE_SERVER_06_URL',
+  'ANIVERSE_SERVER_07_URL',
+  'ANIVERSE_SERVER_08_URL',
+  'ANIVERSE_SERVER_09_URL',
+  'ANIVERSE_SERVER_10_URL',
+  'ANIVERSE_SERVER_11_URL',
+  'ANIVERSE_SERVER_12_URL',
 ] as const;
 
 function withEnv(values: Partial<Record<(typeof ENV_KEYS)[number], string>>, run: () => void): void {
@@ -51,7 +63,7 @@ function withDefaultFile(config: unknown, run: () => void): void {
   const previousEnv = ENV_KEYS.map((key) => [key, process.env[key]] as const);
   for (const key of ENV_KEYS) delete process.env[key];
   const dir = mkdtempSync(join(tmpdir(), 'aniverse-registry-'));
-  const path = join(dir, DEFAULT_SERVERS_FILE.replace(/\//g, '-'));
+  const path = join(dir, DEFAULT_SERVER_CONFIG_FILE.replace(/[/\\/]/g, '-'));
   writeFileSync(path, JSON.stringify(config));
   setDefaultServersFile(path);
   resetRegistry();
@@ -107,6 +119,17 @@ test('a bare checkout still exposes playable reference servers', () => {
   });
 });
 
+test('config/stream-servers.json is auto-discovered without another env setting', () => {
+  // Runs against a temp copy via setDefaultServersFile so the test never
+  // touches — let alone deletes — the checkout's own config/stream-servers.json.
+  withDefaultFile([{ id: 'auto-file', template: 'https://auto-file.example.com/{episode}.m3u8' }], () => {
+    const registry = getRegistry();
+    assert.equal(registry.loadedFrom, 'default-file');
+    assert.equal(registry.configuredCount, 1);
+    assert.equal(registry.servers[0]?.id, 'auto-file');
+  });
+});
+
 test('the proxy allowlist is derived from the configured servers, not just the env var', () => {
   withEnv({}, () => {
     const hosts = getAllowedMediaHosts();
@@ -114,6 +137,27 @@ test('the proxy allowlist is derived from the configured servers, not just the e
     assert.ok(hosts.includes('devstreaming-cdn.apple.com'));
     assert.ok(hosts.length > 0, 'a fresh checkout must not have an empty allowlist');
   });
+});
+
+test('the 12 quick URL slots activate with only one environment value', () => {
+  withEnv(
+    {
+      ANIVERSE_SERVER_01_URL: 'https://quick.example.com/{anilistId}/e{episode3}/master.m3u8',
+      ANIVERSE_SERVER_12_URL: 'https://files.example.com/{slug}/{episode3}.mp4',
+    },
+    () => {
+      const registry = getRegistry();
+      assert.equal(registry.loadedFrom, 'quick-env');
+      assert.equal(registry.configuredCount, 2);
+      assert.deepEqual(registry.servers.slice(0, 2).map((server) => server.id), ['anime-server-01', 'anime-server-12']);
+      assert.equal(registry.servers[1].kind, 'mp4');
+
+      const mirrors = getEpisodeMirrors(anime, 7);
+      assert.equal(mirrors[0].manifestUrl, 'https://quick.example.com/21/e007/master.m3u8');
+      assert.equal(mirrors[1].manifestUrl, 'https://files.example.com/one-piece/007.mp4');
+      assert.ok(getAllowedMediaHosts().includes('quick.example.com'));
+    },
+  );
 });
 
 test('operator servers outrank reference streams and contribute their hosts', () => {

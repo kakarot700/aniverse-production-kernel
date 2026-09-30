@@ -23,9 +23,10 @@
 
 ## Stream servers
 
-- Add origins you own, operate or are licensed to distribute from either by
-  pasting them into `config/stream-servers.json` (auto-detected) or via
-  `ANIVERSE_STREAM_SERVERS` / `ANIVERSE_STREAM_SERVERS_FILE`. See
+- Add origins you own, operate or are licensed to distribute from: paste them
+  into `config/stream-servers.json` (auto-detected, has ready brackets), or use
+  the `ANIVERSE_SERVER_01_URL` … `ANIVERSE_SERVER_12_URL` quick slots,
+  `ANIVERSE_STREAM_SERVERS`, or `ANIVERSE_STREAM_SERVERS_FILE`. See
   `docs/STREAM-SERVERS.md`.
 - Set `ANIVERSE_ENABLE_REFERENCE_STREAMS=false` once real servers exist so the
   public test streams stop appearing in the server rail.

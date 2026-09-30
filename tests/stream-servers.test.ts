@@ -71,6 +71,7 @@ test('only public HTTPS endpoints are accepted', () => {
   assert.equal(isSafeMediaEndpoint('https://cdn.example.com/a.m3u8'), true);
   assert.equal(isSafeMediaEndpoint('http://cdn.example.com/a.m3u8'), false);
   assert.equal(isSafeMediaEndpoint('https://user:pass@cdn.example.com/a.m3u8'), false);
+  assert.equal(isSafeMediaEndpoint('https://cdn.example.com:8443/a.m3u8'), false);
   assert.equal(isSafeMediaEndpoint('https://127.0.0.1/a.m3u8'), false);
   assert.equal(isSafeMediaEndpoint('https://localhost/a.m3u8'), false);
   assert.equal(isSafeMediaEndpoint('https://box.internal/a.m3u8'), false);
@@ -89,9 +90,10 @@ test('static hosts are extracted for the proxy allowlist and templated hosts are
         scope: 'mapped',
         template: '',
         titles: { 'anilist:21': 'https://mapped.example.com/one-piece/{episode3}.m3u8' },
+        episodes: { 'anilist:21': { '1': 'https://episode-cdn.example.com/playback-id.m3u8' } },
       }),
-    ),
-    ['mapped.example.com'],
+    ).sort(),
+    ['episode-cdn.example.com', 'mapped.example.com'],
   );
 });
 
@@ -112,7 +114,20 @@ test('operator definitions are validated and bad entries are reported rather tha
   assert.ok(issues.some((issue) => /Missing "id"/.test(issue.message)));
   assert.ok(issues.some((issue) => /Duplicate/.test(issue.message)));
   assert.ok(issues.some((issue) => /need a "template"/.test(issue.message)));
-  assert.ok(issues.some((issue) => /non-empty "titles"/.test(issue.message)));
+  assert.ok(issues.some((issue) => /non-empty "titles" or "episodes"/.test(issue.message)));
+});
+
+test('dormant bracket placeholders are ignored until one URL is pasted', () => {
+  const dormant = parseServerDefinitions([
+    { id: 'slot-01', placeholder: true, template: '[PASTE LICENSED HLS URL HERE]' },
+  ]);
+  assert.deepEqual(dormant, { servers: [], issues: [] });
+
+  const active = parseServerDefinitions([
+    { id: 'slot-01', placeholder: true, template: 'https://cdn.example.com/{episode}.m3u8' },
+  ]);
+  assert.equal(active.issues.length, 0);
+  assert.equal(active.servers[0]?.id, 'slot-01');
 });
 
 test('a non-array configuration is rejected with a single clear issue', () => {
@@ -204,6 +219,43 @@ test('mirrors resolve in priority order, deduplicated, honouring mapped scope', 
   assert.equal(mirrors[0].manifestUrl, 'https://primary.example.com/one-piece/7.m3u8');
   assert.equal(mirrors[1].manifestUrl, 'https://mapped.example.com/07.m3u8');
   assert.equal(mirrors[2].manifestUrl, 'https://cdn.example.com/one-piece/007/master.m3u8');
+});
+
+test('exact episode maps support random CDN playback ids and outrank title templates', () => {
+  const parsed = parseServerDefinitions([
+    {
+      id: 'mapped-assets',
+      name: 'Mapped assets',
+      scope: 'mapped',
+      titles: { 'anilist:21': 'https://fallback.example.com/one-piece/{episode}.m3u8' },
+      episodes: {
+        'anilist:21': {
+          '1': 'https://stream.mux.com/episode-one-playback-id.m3u8',
+          '2': 'https://customer-code.cloudflarestream.com/episode-two-id/manifest/video.m3u8',
+        },
+      },
+    },
+    {
+      id: 'episodes-only',
+      scope: 'mapped',
+      episodes: { 'anilist:21': { '7': 'https://video.example.com/random-id.m3u8' } },
+    },
+  ]);
+  assert.equal(parsed.issues.length, 0);
+
+  const first = resolveEpisodeMirrors(parsed.servers, tokens, 1, ['anilist:21']);
+  assert.equal(first[0]?.manifestUrl, 'https://stream.mux.com/episode-one-playback-id.m3u8');
+
+  const seventh = resolveEpisodeMirrors(parsed.servers, tokens, 7, ['anilist:21']);
+  assert.deepEqual(
+    seventh.map((mirror) => mirror.manifestUrl),
+    [
+      'https://fallback.example.com/one-piece/7.m3u8',
+      'https://video.example.com/random-id.m3u8',
+    ],
+  );
+
+  assert.deepEqual(resolveEpisodeMirrors(parsed.servers, tokens, 3, ['anilist:999']), []);
 });
 
 test('insecure or unresolvable templates never reach the player', () => {

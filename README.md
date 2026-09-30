@@ -25,6 +25,10 @@ npm run build
 No configuration is needed to start: the catalog is live on first run and the
 bundled reference streams give you working playback immediately.
 
+To connect licensed anime media, copy `.env.example` to `.env.local` and paste
+an HLS/MP4 URL or template into any of the 12 `ANIVERSE_SERVER_XX_URL` slots.
+The slot activates on restart; no player code change is required.
+
 ## What is here
 
 | Area | Behaviour |
@@ -37,7 +41,8 @@ bundled reference streams give you working playback immediately.
 
 Deeper notes: [`docs/ANIME-SOURCES.md`](docs/ANIME-SOURCES.md),
 [`docs/STREAM-SERVERS.md`](docs/STREAM-SERVERS.md),
-[`docs/ROOM-SYNC.md`](docs/ROOM-SYNC.md),
+[`docs/STREAM-SERVER-RESEARCH.md`](docs/STREAM-SERVER-RESEARCH.md),
+[`docs/ROOM-SYNC.md`](docs/ROOM-SYNC.md), and
 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## Catalog
@@ -67,12 +72,15 @@ anything that is not a safe public HTTPS endpoint, sorts by priority, and hands
 the result to the player, which probes each mirror and fails over on error.
 
 The zero-config way to add yours: paste the URL into the bracket file
-**`config/stream-servers.json`** (auto-detected) and restart —
-the in-app **`/servers`** page shows the registry status and the exact JSON to
-copy. Environment alternatives are `ANIVERSE_STREAM_SERVERS` (inline JSON) and
-`ANIVERSE_STREAM_SERVERS_FILE` — see
-[`docs/STREAM-SERVERS.md`](docs/STREAM-SERVERS.md) and
-`config/stream-servers.example.json`.
+**`config/stream-servers.json`** (auto-detected) and restart — the in-app
+**`/servers`** page shows the registry status and the exact JSON to copy.
+Alternatives: the **12 ready URL slots** (`ANIVERSE_SERVER_01_URL` …
+`ANIVERSE_SERVER_12_URL`), `ANIVERSE_STREAM_SERVERS` (inline JSON), or
+`ANIVERSE_STREAM_SERVERS_FILE`. The registry supports universal templates,
+per-title templates, and exact per-episode URLs for managed platforms whose
+playback ids are random. See [`docs/STREAM-SERVERS.md`](docs/STREAM-SERVERS.md),
+[`docs/STREAM-SERVER-RESEARCH.md`](docs/STREAM-SERVER-RESEARCH.md), and the
+bracketed slots in `config/stream-servers.example.json`.
 
 **Out of the box** the registry contains five public reference streams — Mux
 and Apple developer test streams plus the Blender Foundation's CC-BY open

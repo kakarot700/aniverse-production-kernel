@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { DEFAULT_SERVERS_FILE, describeServers, getRegistry, type PublicServerInfo } from '@/lib/streams/registry';
-import type { RegistrySnapshot } from '@/lib/streams/registry';
+import {
+  DEFAULT_SERVER_CONFIG_FILE,
+  describeServers,
+  getRegistry,
+  type PublicServerInfo,
+  type RegistrySnapshot,
+} from '@/lib/streams/registry';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -15,8 +20,12 @@ export const metadata: Metadata = {
 const LOADED_FROM_LABEL: Record<RegistrySnapshot['loadedFrom'], string> = {
   env: 'ANIVERSE_STREAM_SERVERS environment variable',
   file: 'ANIVERSE_STREAM_SERVERS_FILE environment variable',
-  'default-file': `${DEFAULT_SERVERS_FILE} (auto-detected)`,
-  none: `no operator configuration — reference streams only`,
+  'default-file': `${DEFAULT_SERVER_CONFIG_FILE} (auto-detected)`,
+  'quick-env': 'ANIVERSE_SERVER_01_URL… quick slots',
+  'env+quick-env': 'ANIVERSE_STREAM_SERVERS + quick slots',
+  'file+quick-env': 'ANIVERSE_STREAM_SERVERS_FILE + quick slots',
+  'default-file+quick-env': `${DEFAULT_SERVER_CONFIG_FILE} + quick slots`,
+  none: 'no operator configuration — reference streams only',
 };
 
 /** The minimal bracket a viewer copies into config/stream-servers.json. */
@@ -144,7 +153,7 @@ export default function ServersPage() {
           <h2 id="servers-how-title">Add your anime server</h2>
           <ol className="servers-steps">
             <li>
-              Open <code>{DEFAULT_SERVERS_FILE}</code> in the project root — it ships with placeholder brackets
+              Open <code>{DEFAULT_SERVER_CONFIG_FILE}</code> in the project root — it ships with placeholder brackets
               named <code>PASTE-…-HERE</code>.
             </li>
             <li>

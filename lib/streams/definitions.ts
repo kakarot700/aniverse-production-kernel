@@ -15,6 +15,8 @@ import type { StreamKind, StreamLanguage, StreamMirrorNode } from '@/types/media
 
 export type ServerScope = 'universal' | 'mapped';
 
+export type EpisodeTemplateMap = Record<string, Record<string, string>>;
+
 export interface StreamServerDefinition {
   id: string;
   name: string;
@@ -31,11 +33,16 @@ export interface StreamServerDefinition {
   template: string;
   /**
    * `universal`  – the template resolves for any title in the catalog.
-   * `mapped`     – only titles present in `titles` resolve; the mapped value
-   *                overrides `template` for that title.
+   * `mapped`     – only titles present in `titles` or `episodes` resolve.
    */
   scope: ServerScope;
+  /** Per-title URL templates, keyed by an AniList/MAL id or slug. */
   titles?: Record<string, string>;
+  /**
+   * Exact per-episode URLs for CDNs whose playback ids are not predictable.
+   * Shape: `{ "anilist:21": { "1": "https://…m3u8" } }`.
+   */
+  episodes?: EpisodeTemplateMap;
   quality?: string;
   note?: string;
   enabled: boolean;
@@ -208,6 +215,7 @@ export function isSafeMediaEndpoint(raw: string): boolean {
   }
   if (url.protocol !== 'https:') return false;
   if (url.username || url.password) return false;
+  if (url.port && url.port !== '443') return false;
   const host = url.hostname.toLowerCase().replace(/\.$/, '');
   if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
     return false;
@@ -218,7 +226,8 @@ export function isSafeMediaEndpoint(raw: string): boolean {
 
 /** Hostnames a definition can ever reach, ignoring templated (dynamic) hosts. */
 export function staticHostsForDefinition(definition: StreamServerDefinition): string[] {
-  const candidates = [definition.template, ...Object.values(definition.titles ?? {})];
+  const episodeTemplates = Object.values(definition.episodes ?? {}).flatMap((entries) => Object.values(entries));
+  const candidates = [definition.template, ...Object.values(definition.titles ?? {}), ...episodeTemplates];
   const hosts = new Set<string>();
   for (const candidate of candidates) {
     if (!candidate || candidate.includes('{')) {
@@ -249,6 +258,31 @@ function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value.trim() : fallback;
 }
 
+function isBracketPlaceholder(value: string): boolean {
+  return /^\[[^\]]+\]$/.test(value.trim());
+}
+
+function parseEpisodeTemplates(value: unknown): EpisodeTemplateMap {
+  const episodes: EpisodeTemplateMap = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return episodes;
+
+  for (const [rawTitleKey, rawEntries] of Object.entries(value as Record<string, unknown>)) {
+    const titleKey = rawTitleKey.trim().toLowerCase();
+    if (!titleKey || !rawEntries || typeof rawEntries !== 'object' || Array.isArray(rawEntries)) continue;
+
+    const entries: Record<string, string> = {};
+    for (const [rawEpisode, rawUrl] of Object.entries(rawEntries as Record<string, unknown>)) {
+      const episode = Number.parseInt(rawEpisode, 10);
+      const url = asString(rawUrl);
+      if (!Number.isSafeInteger(episode) || episode < 1 || episode > 5000 || !url || isBracketPlaceholder(url)) continue;
+      entries[String(episode)] = url;
+    }
+    if (Object.keys(entries).length > 0) episodes[titleKey] = entries;
+  }
+
+  return episodes;
+}
+
 /**
  * Validates operator-supplied server definitions. Bad entries are dropped with
  * a reported reason instead of taking the whole registry down.
@@ -272,7 +306,9 @@ export function parseServerDefinitions(raw: unknown): {
     const record = entry as Record<string, unknown>;
     const id = asString(record.id).toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 64);
     const name = asString(record.name) || id;
-    const template = asString(record.template ?? record.urlTemplate ?? record.manifestUrl);
+    const templateInput = asString(record.template ?? record.urlTemplate ?? record.manifestUrl);
+    const template = isBracketPlaceholder(templateInput) ? '' : templateInput;
+    const placeholder = record.placeholder === true;
 
     if (!id) {
       issues.push({ index, id: '', message: 'Missing "id".' });
@@ -289,16 +325,22 @@ export function parseServerDefinitions(raw: unknown): {
     if (titlesRaw && typeof titlesRaw === 'object' && !Array.isArray(titlesRaw)) {
       for (const [key, value] of Object.entries(titlesRaw as Record<string, unknown>)) {
         const url = asString(value);
-        if (url) titles[key.trim().toLowerCase()] = url;
+        if (url && !isBracketPlaceholder(url)) titles[key.trim().toLowerCase()] = url;
       }
     }
+    const episodes = parseEpisodeTemplates(record.episodes);
+    const hasMappedUrls = Object.keys(titles).length > 0 || Object.keys(episodes).length > 0;
+
+    // Template files may include dormant slots. They are intentionally silent:
+    // replacing the bracketed value with one URL is enough to activate a slot.
+    if (placeholder && !template && !hasMappedUrls) return;
 
     if (!template && scope === 'universal') {
       issues.push({ index, id, message: 'Universal servers need a "template".' });
       return;
     }
-    if (scope === 'mapped' && Object.keys(titles).length === 0) {
-      issues.push({ index, id, message: 'Mapped servers need a non-empty "titles" map.' });
+    if (scope === 'mapped' && !hasMappedUrls) {
+      issues.push({ index, id, message: 'Mapped servers need a non-empty "titles" or "episodes" map.' });
       return;
     }
 
@@ -320,8 +362,21 @@ export function parseServerDefinitions(raw: unknown): {
         delete titles[key];
       }
     }
-    if (scope === 'mapped' && Object.keys(titles).length === 0) {
-      issues.push({ index, id, message: 'Every "titles" URL was invalid; the server was dropped.' });
+    for (const [titleKey, entries] of Object.entries(episodes)) {
+      for (const [episodeKey, url] of Object.entries(entries)) {
+        if (!isSafeMediaEndpoint(replaceTokensForValidation(url))) {
+          issues.push({
+            index,
+            id,
+            message: `"episodes" entry "${titleKey}" #${episodeKey} is not a public HTTPS URL; it was removed.`,
+          });
+          delete entries[episodeKey];
+        }
+      }
+      if (Object.keys(entries).length === 0) delete episodes[titleKey];
+    }
+    if (scope === 'mapped' && Object.keys(titles).length === 0 && Object.keys(episodes).length === 0) {
+      issues.push({ index, id, message: 'Every mapped URL was invalid; the server was dropped.' });
       return;
     }
 
@@ -346,6 +401,7 @@ export function parseServerDefinitions(raw: unknown): {
       template,
       scope,
       titles: Object.keys(titles).length ? titles : undefined,
+      episodes: Object.keys(episodes).length ? episodes : undefined,
       quality: asString(record.quality) || undefined,
       note: asString(record.note).slice(0, 200) || undefined,
       enabled: record.enabled === false ? false : true,
@@ -363,13 +419,29 @@ export function definitionToMirror(
   titleKeys: string[],
 ): StreamMirrorNode | null {
   let template = definition.template;
-  if (definition.titles) {
-    const mapped = titleKeys.map((key) => definition.titles?.[key]).find(Boolean);
-    if (mapped) template = mapped;
-    else if (definition.scope === 'mapped') return null;
-  } else if (definition.scope === 'mapped') {
-    return null;
+  let mapped = false;
+
+  if (definition.episodes) {
+    const exact = titleKeys
+      .map((key) => definition.episodes?.[key]?.[String(episode)])
+      .find((value): value is string => Boolean(value));
+    if (exact) {
+      template = exact;
+      mapped = true;
+    }
   }
+
+  if (!mapped && definition.titles) {
+    const titleTemplate = titleKeys
+      .map((key) => definition.titles?.[key])
+      .find((value): value is string => Boolean(value));
+    if (titleTemplate) {
+      template = titleTemplate;
+      mapped = true;
+    }
+  }
+
+  if (!mapped && definition.scope === 'mapped') return null;
 
   const url = template ? expandTemplate(template, tokens, episode) : null;
   if (!url || !isSafeMediaEndpoint(url)) return null;
