@@ -1,7 +1,7 @@
 [
   {
-    "id": "server-1-vidcloud",
-    "name": "VidCloud (Sub)",
+    "id": "vidcloud-sub",
+    "name": "VidCloud",
     "group": "9Anime-Style",
     "language": "sub",
     "kind": "hls",
@@ -9,11 +9,11 @@
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "http://localhost:3000/api/extract?server=vidcloud&id={anilistId}&ep={episode}&lang=sub"
+    "template": "http://localhost:5000/api/extract?server=vidcloud&id={anilistId}&ep={episode}&lang=sub"
   },
   {
-    "id": "server-2-streamsb",
-    "name": "StreamSB (Sub)",
+    "id": "streamsb-sub",
+    "name": "StreamSB",
     "group": "9Anime-Style",
     "language": "sub",
     "kind": "hls",
@@ -21,11 +21,11 @@
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "http://localhost:3000/api/extract?server=streamsb&id={anilistId}&ep={episode}&lang=sub"
+    "template": "http://localhost:5000/api/extract?server=streamsb&id={anilistId}&ep={episode}&lang=sub"
   },
   {
-    "id": "server-3-vidstreaming",
-    "name": "Vidstreaming (Sub)",
+    "id": "vidstreaming-sub",
+    "name": "Vidstreaming",
     "group": "9Anime-Style",
     "language": "sub",
     "kind": "hls",
@@ -33,11 +33,11 @@
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "http://localhost:3000/api/extract?server=vidstreaming&id={anilistId}&ep={episode}&lang=sub"
+    "template": "http://localhost:5000/api/extract?server=vidstreaming&id={anilistId}&ep={episode}&lang=sub"
   },
   {
-    "id": "server-4-filemoon",
-    "name": "Filemoon (Sub)",
+    "id": "filemoon-sub",
+    "name": "Filemoon",
     "group": "9Anime-Style",
     "language": "sub",
     "kind": "hls",
@@ -45,11 +45,11 @@
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "http://localhost:3000/api/extract?server=filemoon&id={anilistId}&ep={episode}&lang=sub"
+    "template": "http://localhost:5000/api/extract?server=filemoon&id={anilistId}&ep={episode}&lang=sub"
   },
   {
-    "id": "server-5-xstreamcdn",
-    "name": "Xstreamcdn (Sub)",
+    "id": "xstreamcdn-sub",
+    "name": "Xstreamcdn",
     "group": "9Anime-Style",
     "language": "sub",
     "kind": "hls",
@@ -57,11 +57,11 @@
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "http://localhost:3000/api/extract?server=xstreamcdn&id={anilistId}&ep={episode}&lang=sub"
+    "template": "http://localhost:5000/api/extract?server=xstreamcdn&id={anilistId}&ep={episode}&lang=sub"
   },
   {
-    "id": "server-6-streamtape",
-    "name": "Streamtape (Sub)",
+    "id": "streamtape-sub",
+    "name": "Streamtape",
     "group": "9Anime-Style",
     "language": "sub",
     "kind": "hls",
@@ -69,11 +69,11 @@
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "http://localhost:3000/api/extract?server=streamtape&id={anilistId}&ep={episode}&lang=sub"
+    "template": "http://localhost:5000/api/extract?server=streamtape&id={anilistId}&ep={episode}&lang=sub"
   },
   {
-    "id": "server-7-vidcloud-dub",
-    "name": "VidCloud (Dub)",
+    "id": "vidcloud-dub",
+    "name": "VidCloud",
     "group": "9Anime-Style",
     "language": "dub",
     "kind": "hls",
@@ -81,11 +81,11 @@
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "http://localhost:3000/api/extract?server=vidcloud&id={anilistId}&ep={episode}&lang=dub"
+    "template": "http://localhost:5000/api/extract?server=vidcloud&id={anilistId}&ep={episode}&lang=dub"
   },
   {
-    "id": "server-8-streamsb-dub",
-    "name": "StreamSB (Dub)",
+    "id": "streamsb-dub",
+    "name": "StreamSB",
     "group": "9Anime-Style",
     "language": "dub",
     "kind": "hls",
@@ -93,11 +93,11 @@
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "http://localhost:3000/api/extract?server=streamsb&id={anilistId}&ep={episode}&lang=dub"
+    "template": "http://localhost:5000/api/extract?server=streamsb&id={anilistId}&ep={episode}&lang=dub"
   },
   {
-    "id": "server-9-vidstreaming-dub",
-    "name": "Vidstreaming (Dub)",
+    "id": "vidstreaming-dub",
+    "name": "Vidstreaming",
     "group": "9Anime-Style",
     "language": "dub",
     "kind": "hls",
@@ -105,11 +105,11 @@
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "http://localhost:3000/api/extract?server=vidstreaming&id={anilistId}&ep={episode}&lang=dub"
+    "template": "http://localhost:5000/api/extract?server=vidstreaming&id={anilistId}&ep={episode}&lang=dub"
   },
   {
-    "id": "server-10-doodstream",
-    "name": "Doodstream (Dub)",
+    "id": "filemoon-dub",
+    "name": "Filemoon",
     "group": "9Anime-Style",
     "language": "dub",
     "kind": "hls",
@@ -117,11 +117,11 @@
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "http://localhost:3000/api/extract?server=doodstream&id={anilistId}&ep={episode}&lang=dub"
+    "template": "http://localhost:5000/api/extract?server=filemoon&id={anilistId}&ep={episode}&lang=dub"
   },
   {
-    "id": "server-11-okru",
-    "name": "Okru (Dub)",
+    "id": "doodstream-dub",
+    "name": "Doodstream",
     "group": "9Anime-Style",
     "language": "dub",
     "kind": "hls",
@@ -129,18 +129,18 @@
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "http://localhost:3000/api/extract?server=okru&id={anilistId}&ep={episode}&lang=dub"
+    "template": "http://localhost:5000/api/extract?server=doodstream&id={anilistId}&ep={episode}&lang=dub"
   },
   {
-    "id": "server-12-mp4-fallback",
-    "name": "MP4 Fallback",
-    "group": "Self-hosted",
-    "language": "raw",
-    "kind": "mp4",
+    "id": "okru-dub",
+    "name": "Okru",
+    "group": "9Anime-Style",
+    "language": "dub",
+    "kind": "hls",
     "priority": 120,
     "requiresProxy": true,
     "enabled": true,
     "scope": "universal",
-    "template": "https://files.example.com/anime/{slug}/{episode}.mp4"
+    "template": "http://localhost:5000/api/extract?server=okru&id={anilistId}&ep={episode}&lang=dub"
   }
 ]

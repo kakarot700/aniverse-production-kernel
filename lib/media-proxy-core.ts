@@ -53,6 +53,27 @@ function errorResult(message: string, status: number): ProxyResult {
   };
 }
 
+function isLocalExtractorUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'http:' && url.hostname === 'localhost' &&
+      (url.port === '5000' || url.port === '') && url.pathname === '/api/extract';
+  } catch {
+    return false;
+  }
+}
+
+/** Resolve the local control API server-side; the browser never calls localhost. */
+async function resolveExtractorUrl(raw: string, signal: AbortSignal): Promise<string> {
+  const response = await fetch(raw, { signal, headers: { Accept: 'application/json' }, cache: 'no-store' });
+  if (!response.ok) throw new Error('The extractor did not respond successfully.');
+  const payload = await response.json() as { url?: unknown };
+  if (typeof payload.url !== 'string' || !/^https:\/\//i.test(payload.url)) {
+    throw new Error('The extractor returned no safe HTTPS playlist.');
+  }
+  return payload.url;
+}
+
 async function readBoundedText(body: ReadableStream<Uint8Array> | null): Promise<string> {
   if (!body) return '';
   const reader = body.getReader();
@@ -141,17 +162,30 @@ export async function performMediaProxy(request: ProxyRequest, options: ProxyOpt
   const { rawUrl, method } = request;
   if (!rawUrl || rawUrl.length > 4096) return errorResult('A valid media URL is required.', 400);
 
-  const allowedHosts = options.allowedHosts;
-  if (allowedHosts.length === 0) return errorResult('The media proxy is not configured.', 503);
-
-  const checked = parseAllowedMediaUrl(rawUrl, allowedHosts);
-  if (!checked.ok) return errorResult('The media host is not allowed.', 403);
-
+  let allowedHosts = [...options.allowedHosts];
   const fetchImpl = options.fetchImpl ?? fetch;
   const proxyEndpoint = options.proxyEndpoint ?? '/api/proxy';
   const controller = new AbortController();
   const abortFromCaller = () => controller.abort();
   request.signal?.addEventListener('abort', abortFromCaller, { once: true });
+
+  // Extractor URLs are control-plane endpoints, not media origins. Resolve
+  // them on the server, then allow only the returned public HTTPS hostname for
+  // this request. This keeps localhost out of browser requests and prevents a
+  // caller from turning the media proxy into a general-purpose fetcher.
+  let mediaUrl = rawUrl;
+  if (isLocalExtractorUrl(rawUrl)) {
+    try {
+      mediaUrl = await resolveExtractorUrl(rawUrl, controller.signal);
+      allowedHosts = [...new Set([...allowedHosts, new URL(mediaUrl).hostname])];
+    } catch {
+      return errorResult('The extractor could not resolve a playable source.', 502);
+    }
+  }
+  if (allowedHosts.length === 0) return errorResult('The media proxy is not configured.', 503);
+
+  const checked = parseAllowedMediaUrl(mediaUrl, allowedHosts);
+  if (!checked.ok) return errorResult('The media host is not allowed.', 403);
 
   let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(
     () => controller.abort(),

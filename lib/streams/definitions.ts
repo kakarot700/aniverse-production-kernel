@@ -213,6 +213,15 @@ export function isSafeMediaEndpoint(raw: string): boolean {
   } catch {
     return false;
   }
+  // The local extractor is an intentional exception to the public-HTTPS rule:
+  // it is a fixed same-machine control endpoint, and the Next media proxy
+  // resolves it to an HTTPS playlist before playback.
+  const isLocalExtractor =
+    url.protocol === 'http:' &&
+    url.hostname === 'localhost' &&
+    (url.port === '5000' || url.port === '') &&
+    url.pathname === '/api/extract';
+  if (isLocalExtractor) return !url.username && !url.password;
   if (url.protocol !== 'https:') return false;
   if (url.username || url.password) return false;
   if (url.port && url.port !== '443') return false;
