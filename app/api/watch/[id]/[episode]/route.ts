@@ -146,7 +146,7 @@ export async function GET(
     notice:
       mirrors.length === 0
         ? registry.configuredCount === 0
-          ? 'No stream servers are configured. Add them with ANIVERSE_STREAM_SERVERS (see docs/STREAM-SERVERS.md).'
+          ? 'No stream servers are configured. Paste a licensed URL into an ANIVERSE_SERVER_XX_URL slot or see docs/STREAM-SERVERS.md.'
           : 'No configured server can serve this title yet.'
         : referenceOnly
           ? catalogUnavailable
