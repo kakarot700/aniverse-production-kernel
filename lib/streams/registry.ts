@@ -9,7 +9,7 @@
  * Configuration precedence:
  *  1. `ANIVERSE_STREAM_SERVERS`      – JSON array of server definitions
  *  2. `ANIVERSE_STREAM_SERVERS_FILE` – path to a JSON file with the same shape
- *  3. `config/stream-servers.json`   – auto-discovered local file
+ *  3. `config/stream-servers.json`   – auto-detected paste file (zero config)
  *  4. `ANIVERSE_SERVER_01_URL` … `ANIVERSE_SERVER_12_URL` quick slots
  *  5. built-in public reference streams (unless disabled)
  */
@@ -28,9 +28,11 @@ import {
 export type RegistryConfigSource =
   | 'env'
   | 'file'
+  | 'default-file'
   | 'quick-env'
   | 'env+quick-env'
   | 'file+quick-env'
+  | 'default-file+quick-env'
   | 'none';
 
 export interface RegistrySnapshot {
@@ -44,6 +46,22 @@ export interface RegistrySnapshot {
 
 export const QUICK_SERVER_SLOT_COUNT = 12;
 export const DEFAULT_SERVER_CONFIG_FILE = './config/stream-servers.json';
+
+/**
+ * Auto-detected paste file: when neither `ANIVERSE_STREAM_SERVERS` nor
+ * `ANIVERSE_STREAM_SERVERS_FILE` is set, the registry loads this path — drop
+ * your server list there and restart, no environment configuration needed.
+ */
+let defaultServersFileOverride: string | null | undefined;
+
+/**
+ * Test/seeding hook for that path: `undefined` auto-detects
+ * `${process.cwd()}/${DEFAULT_SERVER_CONFIG_FILE}`, a string probes that path
+ * instead, and `null` disables auto-detection entirely so tests stay hermetic.
+ */
+export function setDefaultServersFile(path: string | null | undefined): void {
+  defaultServersFileOverride = path;
+}
 
 let snapshot: RegistrySnapshot | null = null;
 
@@ -65,6 +83,21 @@ function fileExists(path: string): boolean {
     return fs.existsSync(path);
   } catch {
     return false;
+  }
+}
+
+/**
+ * Resolves the auto-detected config path: the test hook when set, otherwise
+ * `config/stream-servers.json` under the process working directory.
+ */
+function defaultServersFilePath(): string | null {
+  if (defaultServersFileOverride !== undefined) return defaultServersFileOverride;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const nodePath = require('node:path') as typeof import('node:path');
+    return nodePath.join(process.cwd(), DEFAULT_SERVER_CONFIG_FILE);
+  } catch {
+    return null;
   }
 }
 
@@ -113,8 +146,7 @@ function buildSnapshot(): RegistrySnapshot {
   let loadedFrom: RegistryConfigSource = 'none';
 
   const inlineJson = process.env.ANIVERSE_STREAM_SERVERS?.trim();
-  const explicitFilePath = process.env.ANIVERSE_STREAM_SERVERS_FILE?.trim();
-  const filePath = explicitFilePath || (fileExists(DEFAULT_SERVER_CONFIG_FILE) ? DEFAULT_SERVER_CONFIG_FILE : '');
+  const filePath = process.env.ANIVERSE_STREAM_SERVERS_FILE?.trim();
 
   if (inlineJson) {
     try {
@@ -132,16 +164,28 @@ function buildSnapshot(): RegistrySnapshot {
   } else if (filePath) {
     const file = readFileConfig(filePath);
     if (file.error) {
-      issues.push({
-        index: -1,
-        id: '',
-        message: `${explicitFilePath ? 'ANIVERSE_STREAM_SERVERS_FILE' : DEFAULT_SERVER_CONFIG_FILE} could not be read: ${file.error}`,
-      });
+      issues.push({ index: -1, id: '', message: `ANIVERSE_STREAM_SERVERS_FILE could not be read: ${file.error}` });
     } else {
       const parsed = parseServerDefinitions(file.value);
       configured = parsed.servers;
       issues.push(...parsed.issues);
       loadedFrom = 'file';
+    }
+  } else {
+    // Zero-config path: an operator who drops a file at config/stream-servers.json
+    // never needs to touch an environment variable. A missing file is not an
+    // error — a fresh checkout simply falls through to the reference streams.
+    const defaultPath = defaultServersFilePath();
+    if (defaultPath && fileExists(defaultPath)) {
+      const file = readFileConfig(defaultPath);
+      if (file.error) {
+        issues.push({ index: -1, id: '', message: `${DEFAULT_SERVER_CONFIG_FILE} could not be read: ${file.error}` });
+      } else {
+        const parsed = parseServerDefinitions(file.value);
+        configured = parsed.servers;
+        issues.push(...parsed.issues);
+        loadedFrom = 'default-file';
+      }
     }
   }
 
@@ -165,7 +209,9 @@ function buildSnapshot(): RegistrySnapshot {
       ? 'env+quick-env'
       : loadedFrom === 'file'
         ? 'file+quick-env'
-        : 'quick-env';
+        : loadedFrom === 'default-file'
+          ? 'default-file+quick-env'
+          : 'quick-env';
   }
 
   configured.sort((left, right) => left.priority - right.priority);

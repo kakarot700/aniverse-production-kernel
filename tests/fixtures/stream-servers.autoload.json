@@ -1,0 +1,14 @@
+[
+  {
+    "id": "autoload-cdn",
+    "name": "Autoload CDN",
+    "group": "Licensed",
+    "language": "sub",
+    "kind": "hls",
+    "priority": 10,
+    "requiresProxy": true,
+    "enabled": true,
+    "scope": "universal",
+    "template": "https://autoload.example.com/anime/{slug}/{episode}/index.m3u8"
+  }
+]

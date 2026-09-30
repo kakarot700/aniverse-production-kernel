@@ -1,0 +1,54 @@
+[
+  {
+    "id": "my-anime-sub",
+    "name": "My Anime Server (Sub)",
+    "group": "Licensed",
+    "language": "sub",
+    "kind": "hls",
+    "priority": 10,
+    "requiresProxy": true,
+    "enabled": true,
+    "scope": "universal",
+    "template": "PASTE-YOUR-SUB-HLS-URL-HERE",
+    "note": "Bracket 1 (main): replace the template with your .m3u8 URL. Per-episode libraries can use tokens, e.g. https://cdn.example.com/anime/{slug}/{episode}/index.m3u8"
+  },
+  {
+    "id": "my-anime-dub",
+    "name": "My Anime Server (Dub)",
+    "group": "Licensed",
+    "language": "dub",
+    "kind": "hls",
+    "priority": 20,
+    "requiresProxy": true,
+    "enabled": true,
+    "scope": "universal",
+    "template": "PASTE-YOUR-DUB-HLS-URL-HERE",
+    "note": "Bracket 2 (optional): dubbed-audio mirror. Delete this whole block if you do not have one."
+  },
+  {
+    "id": "my-anime-backup",
+    "name": "Backup Mirror",
+    "group": "Licensed",
+    "language": "sub",
+    "kind": "hls",
+    "priority": 30,
+    "requiresProxy": true,
+    "enabled": true,
+    "scope": "universal",
+    "template": "PASTE-YOUR-BACKUP-HLS-URL-HERE",
+    "note": "Bracket 3 (optional): failover mirror. The player switches here automatically when the primary errors."
+  },
+  {
+    "id": "my-anime-files",
+    "name": "My Files (MP4)",
+    "group": "Self-hosted",
+    "language": "raw",
+    "kind": "mp4",
+    "priority": 40,
+    "requiresProxy": true,
+    "enabled": true,
+    "scope": "universal",
+    "template": "PASTE-YOUR-MP4-URL-HERE",
+    "note": "Bracket 4 (optional): direct MP4 file, e.g. https://files.example.com/anime/{slug}/{episode}.mp4"
+  }
+]

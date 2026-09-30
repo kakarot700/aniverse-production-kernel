@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { unlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   DEFAULT_SERVER_CONFIG_FILE,
@@ -9,9 +11,12 @@ import {
   getRegistry,
   parseAllowedHostList,
   resetRegistry,
+  setDefaultServersFile,
   titleKeysFor,
 } from '../lib/streams/registry';
 import type { AnimeSummary } from '../types/anime';
+import autoloadConfig from './fixtures/stream-servers.autoload.json';
+import bracketsConfig from './fixtures/stream-servers.brackets.json';
 
 const ENV_KEYS = [
   'ANIVERSE_STREAM_SERVERS',
@@ -36,13 +41,39 @@ function withEnv(values: Partial<Record<(typeof ENV_KEYS)[number], string>>, run
   const previous = ENV_KEYS.map((key) => [key, process.env[key]] as const);
   for (const key of ENV_KEYS) delete process.env[key];
   for (const [key, value] of Object.entries(values)) process.env[key] = value;
+  // Keep the registry hermetic: never auto-detect a real config/stream-servers.json.
+  setDefaultServersFile(null);
   resetRegistry();
   try {
     run();
   } finally {
     for (const key of ENV_KEYS) delete process.env[key];
     for (const [key, value] of previous) if (value !== undefined) process.env[key] = value;
+    setDefaultServersFile(undefined);
     resetRegistry();
+  }
+}
+
+/**
+ * Writes `config` to a real temp file and points the auto-detected default
+ * path at it, so the file-reading branch of the registry is exercised for
+ * real without touching the checkout's own config/stream-servers.json.
+ */
+function withDefaultFile(config: unknown, run: () => void): void {
+  const previousEnv = ENV_KEYS.map((key) => [key, process.env[key]] as const);
+  for (const key of ENV_KEYS) delete process.env[key];
+  const dir = mkdtempSync(join(tmpdir(), 'aniverse-registry-'));
+  const path = join(dir, DEFAULT_SERVER_CONFIG_FILE.replace(/[/\\/]/g, '-'));
+  writeFileSync(path, JSON.stringify(config));
+  setDefaultServersFile(path);
+  resetRegistry();
+  try {
+    run();
+  } finally {
+    for (const [key, value] of previousEnv) if (value !== undefined) process.env[key] = value;
+    setDefaultServersFile(undefined);
+    resetRegistry();
+    rmSync(dir, { recursive: true, force: true });
   }
 }
 
@@ -89,22 +120,13 @@ test('a bare checkout still exposes playable reference servers', () => {
 });
 
 test('config/stream-servers.json is auto-discovered without another env setting', () => {
-  withEnv({}, () => {
-    writeFileSync(
-      DEFAULT_SERVER_CONFIG_FILE,
-      JSON.stringify([{ id: 'auto-file', template: 'https://auto-file.example.com/{episode}.m3u8' }]),
-      'utf8',
-    );
-    resetRegistry();
-    try {
-      const registry = getRegistry();
-      assert.equal(registry.loadedFrom, 'file');
-      assert.equal(registry.configuredCount, 1);
-      assert.equal(registry.servers[0]?.id, 'auto-file');
-    } finally {
-      unlinkSync(DEFAULT_SERVER_CONFIG_FILE);
-      resetRegistry();
-    }
+  // Runs against a temp copy via setDefaultServersFile so the test never
+  // touches — let alone deletes — the checkout's own config/stream-servers.json.
+  withDefaultFile([{ id: 'auto-file', template: 'https://auto-file.example.com/{episode}.m3u8' }], () => {
+    const registry = getRegistry();
+    assert.equal(registry.loadedFrom, 'default-file');
+    assert.equal(registry.configuredCount, 1);
+    assert.equal(registry.servers[0]?.id, 'auto-file');
   });
 });
 
@@ -234,4 +256,46 @@ test('the public server view never leaks URL templates', () => {
       assert.ok(serialized.includes('Secret'));
     },
   );
+});
+
+test('config/stream-servers.json is auto-detected with zero environment variables', () => {
+  withDefaultFile(autoloadConfig, () => {
+    const registry = getRegistry();
+    assert.equal(registry.loadedFrom, 'default-file');
+    assert.equal(registry.configuredCount, 1);
+    assert.deepEqual(registry.issues, []);
+
+    assert.ok(getAllowedMediaHosts().includes('autoload.example.com'));
+
+    const mirrors = getEpisodeMirrors(anime, 3);
+    assert.equal(mirrors[0].id, 'autoload-cdn');
+    assert.equal(mirrors[0].manifestUrl, 'https://autoload.example.com/anime/one-piece/3/index.m3u8');
+    assert.ok(mirrors.slice(1).every((mirror) => mirror.isReference), 'reference streams stay as failover');
+  });
+});
+
+test('empty paste brackets are reported as issues and never disturb playback', () => {
+  withDefaultFile(bracketsConfig, () => {
+    const registry = getRegistry();
+    assert.equal(registry.configuredCount, 0);
+    assert.equal(registry.issues.length, 2);
+    assert.ok(registry.issues.every((issue) => /public HTTPS URL/.test(issue.message)));
+    assert.ok(registry.issues.some((issue) => issue.id === 'my-anime-sub'));
+
+    assert.ok(registry.servers.every((server) => server.isReference));
+    const mirrors = getEpisodeMirrors(anime, 1);
+    assert.ok(mirrors.length > 0, 'reference streams must keep playback alive');
+    assert.ok(mirrors.every((mirror) => mirror.isReference));
+  });
+});
+
+test('a broken default file is reported instead of crashing the registry', () => {
+  withDefaultFile({ not: 'an array' }, () => {
+    const registry = getRegistry();
+    assert.equal(registry.loadedFrom, 'default-file');
+    assert.equal(registry.configuredCount, 0);
+    assert.equal(registry.issues.length, 1);
+    assert.match(registry.issues[0].message, /JSON array/);
+    assert.ok(registry.servers.length > 0);
+  });
 });

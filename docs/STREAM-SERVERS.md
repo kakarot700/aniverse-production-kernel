@@ -48,18 +48,59 @@ automatically marked as progressive MP4; every other quick URL is HLS.
 A literal URL is valid but serves the same asset for every selection. To serve
 a catalog, use template tokens or the mapped configuration below.
 
+## Zero-config setup: the paste file
+
+Even faster: no environment file at all. The tracked
+`config/stream-servers.json` already contains the brackets:
+
+1. Open **`config/stream-servers.json`** in the project root. It ships with
+   four `PASTE-…-HERE` brackets (sub, dub, backup, MP4).
+2. Paste your stream URL into a `template` bracket.
+3. Restart the app. The registry is read once per process.
+4. Open **`/servers`** in the app (or `GET /api/servers`) and confirm your
+   server is listed and the bracket's reminder issue is gone.
+
+```json
+[
+  {
+    "id": "my-anime-sub",
+    "name": "My Anime Server (Sub)",
+    "group": "Licensed",
+    "language": "sub",
+    "kind": "hls",
+    "priority": 10,
+    "enabled": true,
+    "template": "https://your-cdn.example.com/anime/{slug}/{episode}/index.m3u8"
+  }
+]
+```
+
+A bare URL with no tokens serves that one video for every episode — exactly
+what the reference streams do. Tokens (`{slug}`, `{episode}`, …) make the URL
+per-episode; the full table is below.
+
+A URL that is not a public HTTPS endpoint (`http://`, an IP literal,
+`localhost`, credentials) is rejected with a visible reason on `/servers`, so
+a typo can never silently produce a dead mirror. Empty `PASTE-…` brackets
+stay visible as reminders until filled; `[bracketed]` slots marked
+`"placeholder": true` — the style used by `config/stream-servers.example.json`
+— stay silent instead. Both activate the moment a real URL is pasted.
+
 ## Full-control JSON setup
 
-The tracked example has **12 dormant bracketed slots**. Copy it to the ignored
-local file, then replace any bracketed `template` value. Bracket placeholders
-are skipped silently, while each replaced URL activates immediately:
+`config/stream-servers.json` ships with four active `PASTE-…-HERE` brackets
+(sub, dub, backup, MP4). The tracked example file adds **12 dormant bracketed
+slots** with every field spelled out; copy it over if you prefer that layout:
 
 ```sh
 cp config/stream-servers.example.json config/stream-servers.json
 ```
 
-`config/stream-servers.json` is auto-discovered. It is gitignored to keep
-signed URLs and private origin names out of source control. You may instead set:
+`config/stream-servers.json` is auto-discovered and its empty brackets are
+committed on purpose, so a fresh checkout always has a visible place to paste.
+If your URLs contain signing paths you would rather keep out of source
+control, add the file to `.gitignore` in your own deployment — the app does
+not care either way. You may instead set:
 
 - `ANIVERSE_STREAM_SERVERS` to an inline JSON array; or
 - `ANIVERSE_STREAM_SERVERS_FILE` to another JSON file path.
@@ -193,7 +234,10 @@ See [REFERENCE-SOURCES.md](REFERENCE-SOURCES.md) for provenance.
 
 ## Validation and proxy safety
 
-- Bad entries are dropped individually and reported by `GET /api/servers`.
+- Bad entries are dropped individually and reported by `GET /api/servers` and
+  the in-app `/servers` page. Unfilled `PASTE-…-HERE` brackets stay visible as
+  reminders until a URL is pasted; `[bracketed]` `placeholder` slots stay
+  silent.
 - Expanded URLs must be HTTPS on the default TLS port, credential-free, and
   must not target literal IPs, loopback, `.local` or `.internal` hosts.
 - The proxy allowlist is derived from configured templates, title maps and

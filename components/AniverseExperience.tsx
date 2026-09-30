@@ -100,6 +100,7 @@ export function AniverseExperience({ initialPage, currentSeason }: AniverseExper
         <nav className="header-nav" aria-label="Main navigation">
           <a href="#collection">Discover</a>
           <a href="#about">About</a>
+          <a href="/servers">Servers</a>
           <button type="button" onClick={() => featured && setSelected(featured)}>Watch together</button>
         </nav>
         <span className="header-note">
