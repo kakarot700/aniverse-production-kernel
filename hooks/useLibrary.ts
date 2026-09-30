@@ -16,14 +16,26 @@ import {
 } from '@/lib/user-data/library';
 import { loadLibrary, saveLibrary, subscribeLibrary } from '@/lib/user-data/local-library';
 
+/** What the watchlist needs, plus the taste signals recommendations use. */
+export interface SaveableTitle {
+  mediaId: string;
+  title: string;
+  coverImage: string;
+  genres?: string[];
+  studios?: string[];
+  format?: string | null;
+}
+
 export interface UseLibraryResult {
   ready: boolean;
+  /** Raw state, for callers that need to derive from it (recommendations). */
+  state: LibraryState | null;
   continueRow: ContinueWatchingItem[];
   watchlist: WatchlistEntry[];
   isSaved: (mediaId: string) => boolean;
   resumeFor: (mediaId: string, episodeNumber: number) => number;
   saveProgress: (input: RecordProgressInput) => void;
-  toggleSaved: (entry: { mediaId: string; title: string; coverImage: string }) => void;
+  toggleSaved: (entry: SaveableTitle) => void;
   forget: (mediaId: string) => void;
 }
 
@@ -58,7 +70,7 @@ export function useLibrary(): UseLibraryResult {
   );
 
   const toggleSaved = useCallback(
-    (entry: { mediaId: string; title: string; coverImage: string }) => {
+    (entry: SaveableTitle) => {
       const current = state ?? loadLibrary();
       commit(toggleWatchlist(current, entry));
     },
@@ -85,6 +97,7 @@ export function useLibrary(): UseLibraryResult {
 
   return {
     ready: state !== null,
+    state,
     continueRow,
     watchlist,
     isSaved,

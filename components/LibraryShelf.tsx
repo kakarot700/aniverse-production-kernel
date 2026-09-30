@@ -1,5 +1,6 @@
 'use client';
 
+import type { ScoredRecommendation } from '@/lib/recommendations';
 import type { ContinueWatchingItem, WatchlistEntry } from '@/lib/user-data/library';
 import type { AnimeSummary } from '@/types/anime';
 
@@ -126,6 +127,49 @@ export function WatchlistShelf({ items, onOpen }: WatchlistShelfProps) {
                 <span className="shelf-play" aria-hidden="true">▶</span>
               </span>
               <span className="shelf-title" title={item.title}>{item.title}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+interface RecommendationShelfProps {
+  items: ScoredRecommendation[];
+  topGenres: string[];
+  onOpen: (summary: AnimeSummary) => void;
+}
+
+export function RecommendationShelf({ items, topGenres, onOpen }: RecommendationShelfProps) {
+  if (items.length === 0) return null;
+
+  return (
+    <section className="shelf" aria-labelledby="recommend-title">
+      <div className="shelf-head">
+        <div>
+          <p className="eyebrow">
+            {topGenres.length > 0 ? `Because you watch ${topGenres.join(' · ')}` : 'Matched to your history'}
+          </p>
+          <h2 id="recommend-title">Recommended for you</h2>
+        </div>
+        <span className="shelf-count">from your local history</span>
+      </div>
+      <ul className="shelf-row">
+        {items.map(({ item, reason }) => (
+          <li className="shelf-item" key={item.id}>
+            <button
+              type="button"
+              className="shelf-card"
+              onClick={() => onOpen(item)}
+              aria-label={`Open ${item.title}`}
+            >
+              <span className="shelf-art">
+                <img src={item.coverImage || FALLBACK_POSTER} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                <span className="shelf-play" aria-hidden="true">▶</span>
+              </span>
+              <span className="shelf-title" title={item.title}>{item.title}</span>
+              <span className="shelf-sub">{reason}</span>
             </button>
           </li>
         ))}

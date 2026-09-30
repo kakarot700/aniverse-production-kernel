@@ -35,6 +35,10 @@ export interface EpisodeProgress {
   coverImage: string;
   /** Total episodes when known, so a finished series can leave the row. */
   episodeCount: number | null;
+  /** Taste signals for `lib/recommendations.ts`; absent on older records. */
+  genres?: string[];
+  studios?: string[];
+  format?: string | null;
 }
 
 export interface WatchlistEntry {
@@ -42,6 +46,9 @@ export interface WatchlistEntry {
   title: string;
   coverImage: string;
   addedAt: number;
+  genres?: string[];
+  studios?: string[];
+  format?: string | null;
 }
 
 export interface LibraryState {
@@ -86,6 +93,9 @@ export interface RecordProgressInput {
   title: string;
   coverImage: string;
   episodeCount?: number | null;
+  genres?: string[];
+  studios?: string[];
+  format?: string | null;
   now?: number;
 }
 
@@ -112,6 +122,9 @@ export function recordProgress(state: LibraryState, input: RecordProgressInput):
     title: input.title,
     coverImage: input.coverImage,
     episodeCount: input.episodeCount ?? state.progress[key]?.episodeCount ?? null,
+    genres: input.genres ?? state.progress[key]?.genres,
+    studios: input.studios ?? state.progress[key]?.studios,
+    format: input.format ?? state.progress[key]?.format ?? null,
   };
 
   return prune({ ...state, progress: { ...state.progress, [key]: entry } });
@@ -191,7 +204,14 @@ export function isInWatchlist(state: LibraryState, mediaId: string): boolean {
 
 export function toggleWatchlist(
   state: LibraryState,
-  entry: { mediaId: string; title: string; coverImage: string },
+  entry: {
+    mediaId: string;
+    title: string;
+    coverImage: string;
+    genres?: string[];
+    studios?: string[];
+    format?: string | null;
+  },
   now = Date.now(),
 ): LibraryState {
   const mediaId = entry.mediaId.trim();
@@ -201,7 +221,15 @@ export function toggleWatchlist(
   if (watchlist[mediaId]) {
     delete watchlist[mediaId];
   } else {
-    watchlist[mediaId] = { mediaId, title: entry.title, coverImage: entry.coverImage, addedAt: now };
+    watchlist[mediaId] = {
+      mediaId,
+      title: entry.title,
+      coverImage: entry.coverImage,
+      addedAt: now,
+      genres: entry.genres,
+      studios: entry.studios,
+      format: entry.format ?? null,
+    };
   }
   return { ...state, watchlist };
 }
@@ -234,6 +262,12 @@ export function prune(state: LibraryState, maxEntries = MAX_PROGRESS_ENTRIES): L
  * JSON is user-writable and may be from an older build, so every field is
  * re-checked rather than trusted.
  */
+function stringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items = value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0).slice(0, 30);
+  return items.length > 0 ? items : undefined;
+}
+
 export function parseLibrary(raw: unknown): LibraryState {
   if (!raw || typeof raw !== 'object') return emptyLibrary();
   const source = raw as Partial<LibraryState>;
@@ -257,6 +291,9 @@ export function parseLibrary(raw: unknown): LibraryState {
         title: typeof entry.title === 'string' ? entry.title : 'Untitled',
         coverImage: typeof entry.coverImage === 'string' ? entry.coverImage : '',
         episodeCount: Number.isSafeInteger(entry.episodeCount) ? (entry.episodeCount as number) : null,
+        genres: stringArray(entry.genres),
+        studios: stringArray(entry.studios),
+        format: typeof entry.format === 'string' ? entry.format : null,
       };
     }
   }
@@ -272,6 +309,9 @@ export function parseLibrary(raw: unknown): LibraryState {
         title: typeof entry.title === 'string' ? entry.title : 'Untitled',
         coverImage: typeof entry.coverImage === 'string' ? entry.coverImage : '',
         addedAt: Number.isFinite(entry.addedAt) ? (entry.addedAt as number) : 0,
+        genres: stringArray(entry.genres),
+        studios: stringArray(entry.studios),
+        format: typeof entry.format === 'string' ? entry.format : null,
       };
     }
   }

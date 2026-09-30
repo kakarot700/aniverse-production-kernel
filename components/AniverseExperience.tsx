@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CatalogCard } from '@/components/CatalogCard';
-import { ContinueShelf, WatchlistShelf } from '@/components/LibraryShelf';
+import { ContinueShelf, RecommendationShelf, WatchlistShelf } from '@/components/LibraryShelf';
 import { TitleDialog } from '@/components/TitleDialog';
 import { useCatalog, useDebouncedValue } from '@/hooks/useAnimeData';
 import { useLibrary } from '@/hooks/useLibrary';
+import { profileFromLibrary, recommend, topGenres } from '@/lib/recommendations';
 import { describeRuntime, formatLabel } from '@/lib/anime/text';
 import {
   ANIME_FORMATS,
@@ -59,6 +60,16 @@ export function AniverseExperience({ initialPage, currentSeason }: AniverseExper
     perPage: 24,
     initialPage: isPristine ? initialPage : null,
   });
+
+  // Recommendations are derived locally from stored history and whatever the
+  // catalog has already loaded — no extra request, and nothing about the
+  // viewer's habits leaves the browser.
+  const recommendations = useMemo(() => {
+    if (!library.state) return { items: [], genres: [] as string[] };
+    const profile = profileFromLibrary(library.state);
+    if (profile.strength <= 0) return { items: [], genres: [] as string[] };
+    return { items: recommend(catalog.items, profile, { limit: 12 }), genres: topGenres(profile) };
+  }, [catalog.items, library.state]);
 
   const featured = useMemo(
     () => initialPage?.items[0] ?? catalog.items[0] ?? null,
@@ -156,6 +167,11 @@ export function AniverseExperience({ initialPage, currentSeason }: AniverseExper
         {!search ? (
           <>
             <ContinueShelf items={library.continueRow} onOpen={setSelected} onForget={library.forget} />
+            <RecommendationShelf
+              items={recommendations.items}
+              topGenres={recommendations.genres}
+              onOpen={setSelected}
+            />
             <WatchlistShelf items={library.watchlist} onOpen={setSelected} />
           </>
         ) : null}

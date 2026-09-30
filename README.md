@@ -39,12 +39,16 @@ The slot activates on restart; no player code change is required.
 | Media proxy | Same-origin HLS gateway with a derived host allowlist, per-hop redirect re-checks, manifest rewriting, range and content-encoding correctness. |
 | Watch rooms | Private Supabase Broadcast channels, four-timestamp clock sync, drift correction. |
 | Your library | Continue-watching with per-episode resume and a saved list. Local-first: works with no account, no Supabase, no network. |
+| Skip intro/outro | AniSkip crowd timestamps, with an auto-skip toggle. |
+| Recommendations | A taste profile scored from local history — genre, studio and recency weighted. Nothing leaves the browser. |
+| Player | Keyboard shortcuts, picture-in-picture, persisted volume, live playback-statistics overlay, next-episode prefetch. |
 
 **Adding your own servers: [`docs/ADDING-SERVERS.md`](docs/ADDING-SERVERS.md).**
 
 Deeper notes: [`docs/ANIME-SOURCES.md`](docs/ANIME-SOURCES.md),
 [`docs/STREAM-SERVERS.md`](docs/STREAM-SERVERS.md),
 [`docs/FAILOVER.md`](docs/FAILOVER.md),
+[`docs/ADVANCED-FEATURES.md`](docs/ADVANCED-FEATURES.md),
 [`docs/STREAM-SERVER-RESEARCH.md`](docs/STREAM-SERVER-RESEARCH.md),
 [`docs/ROOM-SYNC.md`](docs/ROOM-SYNC.md), and
 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
@@ -65,6 +69,7 @@ GET /api/catalog?mode=trending|popular|top|seasonal|upcoming|search
 GET /api/anime/:id                    # anilist:<n> | mal:<n> | <n> | offline:<slug>
 GET /api/watch/:id/:episode           # ranked stream servers for one episode
 GET /api/servers                      # registry state + config diagnostics
+GET /api/skip/:malId/:episode?length= # AniSkip opening/ending timestamps
 GET|HEAD /api/proxy?url=<https url>   # same-origin media gateway
 ```
 

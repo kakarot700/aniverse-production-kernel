@@ -7,6 +7,7 @@ import { ServerRail } from '@/components/ServerRail';
 import { WatchRoomPanel } from '@/components/WatchRoomPanel';
 import { useAnimeDetail, useWatchSources } from '@/hooks/useAnimeData';
 import { useLibrary } from '@/hooks/useLibrary';
+import { useSkipTimes } from '@/hooks/useSkipTimes';
 import { describeRuntime, formatLabel, titleCase } from '@/lib/anime/text';
 import type { AnimeSummary } from '@/types/anime';
 
@@ -38,6 +39,7 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
   const [activeMirrorIndex, setActiveMirrorIndex] = useState<number | null>(null);
 
   const [resumeSeconds, setResumeSeconds] = useState(0);
+  const [durationSeconds, setDurationSeconds] = useState(0);
 
   const { detail, loading: detailLoading } = useAnimeDetail(summary.id, summary);
   const record = detail ?? null;
@@ -56,6 +58,16 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
   const episodeCount = record?.episodes.length || record?.episodeCount || summary.episodeCount || null;
   const isSaved = library.isSaved(summary.id);
 
+  // Taste signals stored alongside progress so recommendations can be built
+  // from local history alone, without re-fetching every watched title.
+  const genresForLibrary = record?.genres ?? summary.genres;
+  const studiosForLibrary = record?.studios ?? summary.studios;
+  const formatForLibrary = record?.format ?? summary.format;
+
+  // AniSkip is keyed by MyAnimeList id and needs the real runtime, so this
+  // stays dormant until the player reports a duration.
+  const skipTimestamps = useSkipTimes(record?.malId ?? summary.malId, episodeNumber, durationSeconds);
+
   const openedTitleRef = useRef('');
   const resumeKeyRef = useRef('');
   const lastSaveAtRef = useRef(0);
@@ -69,7 +81,27 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
 
   useEffect(() => {
     setRequestedMirrorIndex(null);
+    setDurationSeconds(0);
   }, [episodeNumber]);
+
+  // Warm the next episode's server list so hitting "next" resolves instantly
+  // instead of waiting on a fresh round trip. Fire-and-forget; a failure here
+  // costs nothing because the real request will run normally.
+  useEffect(() => {
+    if (!episodeCount || episodeNumber >= episodeCount) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/watch/${encodeURIComponent(summary.id)}/${episodeNumber + 1}`, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      }).catch(() => undefined);
+    }, 2_500);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [episodeCount, episodeNumber, summary.id]);
 
   // Open on the episode the viewer was last on, once storage has been read.
   useEffect(() => {
@@ -117,6 +149,11 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
     (next: number, durationMs: number) => {
       setPositionMs(next);
       lastKnownRef.current = { positionMs: next, durationMs, episodeNumber };
+      if (durationMs > 0) {
+        const seconds = durationMs / 1000;
+        // Only update on a real change; this feeds the AniSkip lookup key.
+        setDurationSeconds((current) => (Math.abs(current - seconds) > 1 ? seconds : current));
+      }
 
       const now = Date.now();
       if (now - lastSaveAtRef.current < PROGRESS_SAVE_INTERVAL_MS) return;
@@ -129,9 +166,15 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
         title: titleForLibrary,
         coverImage: coverForLibrary,
         episodeCount,
+        genres: genresForLibrary,
+        studios: studiosForLibrary,
+        format: formatForLibrary,
       });
     },
-    [coverForLibrary, episodeCount, episodeNumber, summary.id, titleForLibrary],
+    [
+      coverForLibrary, episodeCount, episodeNumber, formatForLibrary, genresForLibrary,
+      studiosForLibrary, summary.id, titleForLibrary,
+    ],
   );
 
   // Closing the dialog (or switching episode) must not lose the last few
@@ -148,17 +191,26 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
         title: titleForLibrary,
         coverImage: coverForLibrary,
         episodeCount,
+        genres: genresForLibrary,
+        studios: studiosForLibrary,
+        format: formatForLibrary,
       });
     };
-  }, [coverForLibrary, episodeCount, summary.id, titleForLibrary]);
+  }, [
+    coverForLibrary, episodeCount, formatForLibrary, genresForLibrary,
+    studiosForLibrary, summary.id, titleForLibrary,
+  ]);
 
   const handleToggleSaved = useCallback(() => {
     libraryRef.current.toggleSaved({
       mediaId: summary.id,
       title: titleForLibrary,
       coverImage: coverForLibrary,
+      genres: genresForLibrary,
+      studios: studiosForLibrary,
+      format: formatForLibrary,
     });
-  }, [coverForLibrary, summary.id, titleForLibrary]);
+  }, [coverForLibrary, formatForLibrary, genresForLibrary, studiosForLibrary, summary.id, titleForLibrary]);
 
   const handleVideoElement = useCallback((element: HTMLVideoElement | null) => setVideoElement(element), []);
   const handleActiveMirror = useCallback((index: number | null) => setActiveMirrorIndex(index), []);
@@ -219,6 +271,7 @@ export function TitleDialog({ summary, onClose }: TitleDialogProps) {
             episodeLabel={episodeLabel}
             loading={sourcesLoading}
             requestedMirrorIndex={requestedMirrorIndex}
+            skipTimestamps={skipTimestamps ?? undefined}
             startPositionSeconds={resumeSeconds}
             onProgress={handleProgress}
             onVideoElement={handleVideoElement}

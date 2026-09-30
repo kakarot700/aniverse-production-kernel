@@ -53,6 +53,34 @@ function writePreferredServerId(id: string): void {
   }
 }
 
+const AUTO_SKIP_KEY = 'aniverse:auto-skip';
+
+export interface PlaybackStats {
+  resolution: string;
+  bitrateKbps: number | null;
+  bufferAheadSeconds: number;
+  droppedFrames: number | null;
+  levelCount: number;
+  connectionMs: number | null;
+  serverName: string;
+}
+
+function readAutoSkip(): boolean {
+  try {
+    return window.localStorage.getItem(AUTO_SKIP_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function writeAutoSkip(value: boolean): void {
+  try {
+    window.localStorage.setItem(AUTO_SKIP_KEY, String(value));
+  } catch {
+    // Non-fatal.
+  }
+}
+
 /** Volume and mute survive episode changes and reloads, like any real player. */
 function readStoredVolume(): { volume: number; muted: boolean } | null {
   try {
@@ -98,6 +126,9 @@ export function MasterPlayer({
   const [currentLevel, setCurrentLevel] = useState(-1);
   const [skipHint, setSkipHint] = useState<'intro' | 'outro' | null>(null);
   const [pipAvailable, setPipAvailable] = useState(false);
+  const [autoSkip, setAutoSkip] = useState(readAutoSkip);
+  const [showStats, setShowStats] = useState(false);
+  const [stats, setStats] = useState<PlaybackStats | null>(null);
 
   // Read through a ref so changing the resume point never restarts the race.
   const startPositionRef = useRef(startPositionSeconds);
@@ -112,6 +143,11 @@ export function MasterPlayer({
 
   const skipRef = useRef(skipTimestamps);
   skipRef.current = skipTimestamps;
+
+  const autoSkipRef = useRef(autoSkip);
+  autoSkipRef.current = autoSkip;
+
+  const connectionRef = useRef<{ latencyMs: number | null; name: string }>({ latencyMs: null, name: '' });
 
   const hlsRef = useRef<Hls | null>(null);
   const workerRef = useRef<Worker | null>(null);
@@ -231,6 +267,44 @@ export function MasterPlayer({
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [video]);
+
+  // Sample playback telemetry while the stats overlay is open. Polling only
+  // while visible keeps this off the hot path when nobody is looking.
+  useEffect(() => {
+    if (!showStats || !video) return;
+
+    const sample = () => {
+      const hls = hlsRef.current;
+      const level = hls && hls.currentLevel >= 0 ? hls.levels[hls.currentLevel] : null;
+
+      let bufferAhead = 0;
+      for (let index = 0; index < video.buffered.length; index += 1) {
+        if (video.buffered.start(index) <= video.currentTime && video.currentTime <= video.buffered.end(index)) {
+          bufferAhead = video.buffered.end(index) - video.currentTime;
+          break;
+        }
+      }
+
+      const quality = video.getVideoPlaybackQuality?.();
+      setStats({
+        resolution: level?.height
+          ? `${level.width ?? '?'}×${level.height}`
+          : video.videoWidth
+            ? `${video.videoWidth}×${video.videoHeight}`
+            : '—',
+        bitrateKbps: level?.bitrate ? Math.round(level.bitrate / 1000) : null,
+        bufferAheadSeconds: Math.max(0, bufferAhead),
+        droppedFrames: quality ? quality.droppedVideoFrames : null,
+        levelCount: hls ? hls.levels.length : 0,
+        connectionMs: connectionRef.current.latencyMs,
+        serverName: connectionRef.current.name,
+      });
+    };
+
+    sample();
+    const timer = window.setInterval(sample, 1_000);
+    return () => window.clearInterval(timer);
+  }, [showStats, video]);
 
   const togglePictureInPicture = useCallback(() => {
     if (!video) return;
@@ -431,6 +505,10 @@ export function MasterPlayer({
         callbacksRef.current.onActiveMirrorChange?.(message.payload.index);
         setFatalError('');
         writePreferredServerId(message.payload.id);
+        connectionRef.current = {
+          latencyMs: message.payload.probed ? message.payload.latencyMs : null,
+          name: message.payload.name,
+        };
         const raced =
           message.payload.attempts > 1 ? ` (won a ${message.payload.attempts}-way race)` : '';
         setStatus(
@@ -484,9 +562,26 @@ export function MasterPlayer({
       const skip = skipRef.current;
       if (!skip) return;
       const time = video.currentTime;
-      if (time >= skip.introStart && time < skip.introEnd) {
+      const inIntro = skip.introEnd > skip.introStart && time >= skip.introStart && time < skip.introEnd;
+      const inOutro = skip.outroEnd > skip.outroStart && time >= skip.outroStart && time < skip.outroEnd;
+
+      if (inIntro) {
+        // Auto-skip jumps once per segment. `lastSkipPoint` is the guard: a
+        // viewer who deliberately seeks back into the opening is not fought.
+        if (autoSkipRef.current && lastSkipPoint !== 'intro') {
+          lastSkipPoint = 'intro';
+          video.currentTime = skip.introEnd;
+          setSkipHint(null);
+          return;
+        }
         if (lastSkipPoint !== 'intro') setSkipHint('intro');
-      } else if (time >= skip.outroStart && time < skip.outroEnd) {
+      } else if (inOutro) {
+        if (autoSkipRef.current && lastSkipPoint !== 'outro') {
+          lastSkipPoint = 'outro';
+          video.currentTime = skip.outroEnd;
+          setSkipHint(null);
+          return;
+        }
         if (lastSkipPoint !== 'outro') setSkipHint('outro');
       } else {
         setSkipHint(null);
@@ -544,6 +639,13 @@ export function MasterPlayer({
     setSkipHint(null);
   };
 
+  const toggleAutoSkip = () => {
+    setAutoSkip((current) => {
+      writeAutoSkip(!current);
+      return !current;
+    });
+  };
+
   const changeLevel = (value: number) => {
     setCurrentLevel(value);
     if (hlsRef.current) hlsRef.current.currentLevel = value;
@@ -565,6 +667,19 @@ export function MasterPlayer({
           <button type="button" className="skip-button" onClick={applySkip}>
             Skip {skipHint}
           </button>
+        ) : null}
+        {showStats && stats ? (
+          <div className="stats-overlay" role="status" aria-live="off">
+            <dl>
+              <div><dt>Server</dt><dd>{stats.serverName || '—'}</dd></div>
+              <div><dt>Connected in</dt><dd>{stats.connectionMs != null ? `${stats.connectionMs} ms` : 'not probed'}</dd></div>
+              <div><dt>Resolution</dt><dd>{stats.resolution}</dd></div>
+              <div><dt>Bitrate</dt><dd>{stats.bitrateKbps != null ? `${stats.bitrateKbps.toLocaleString()} kbps` : '—'}</dd></div>
+              <div><dt>Buffer ahead</dt><dd>{stats.bufferAheadSeconds.toFixed(1)} s</dd></div>
+              <div><dt>Dropped frames</dt><dd>{stats.droppedFrames ?? '—'}</dd></div>
+              <div><dt>Renditions</dt><dd>{stats.levelCount || '—'}</dd></div>
+            </dl>
+          </div>
         ) : null}
         {fatalError ? (
           <div className="player-empty" aria-live="polite">
@@ -596,6 +711,26 @@ export function MasterPlayer({
               </select>
             </label>
           ) : null}
+          {skipTimestamps ? (
+            <button
+              type="button"
+              className={autoSkip ? 'button-quiet player-tool is-on' : 'button-quiet player-tool'}
+              aria-pressed={autoSkip}
+              onClick={toggleAutoSkip}
+              title="Automatically skip openings and endings when timestamps are available"
+            >
+              Auto-skip {autoSkip ? 'on' : 'off'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={showStats ? 'button-quiet player-tool is-on' : 'button-quiet player-tool'}
+            aria-pressed={showStats}
+            onClick={() => setShowStats((current) => !current)}
+            title="Playback statistics"
+          >
+            Stats
+          </button>
           {pipAvailable ? (
             <button
               type="button"
