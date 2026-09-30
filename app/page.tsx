@@ -1,4 +1,4 @@
-import { AniverseExperience } from '@/components/AniverseExperience';
+import { HomeView } from '@/components/HomeView';
 import { currentAnimeSeason, getCatalogPage, normalizeCatalogQuery } from '@/lib/anime';
 import type { CatalogPage } from '@/types/anime';
 
@@ -26,5 +26,5 @@ export default async function HomePage() {
     initialPage = null;
   }
 
-  return <AniverseExperience initialPage={initialPage} currentSeason={currentAnimeSeason()} />;
+  return <HomeView initialPage={initialPage} currentSeason={currentAnimeSeason()} />;
 }

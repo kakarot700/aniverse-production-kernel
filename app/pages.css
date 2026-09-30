@@ -1,0 +1,453 @@
+/**
+ * Page-level components: headers, rails, schedule, profile, settings.
+ *
+ * Built on the tokens in shell.css. Anything that describes a *component's*
+ * own adaptation uses container queries; anything that describes the page
+ * uses media queries.
+ */
+
+/* ─────────────────────────── page scaffolding ─────────────────────── */
+
+.page { display: flex; flex-direction: column; gap: var(--space-5); }
+
+.page-head { display: grid; gap: var(--space-2); }
+.page-title {
+  margin: 0;
+  /* Fluid type: one declaration instead of three breakpoints, and it stays
+     correct at sizes nobody tested. */
+  font-size: clamp(1.6rem, 1.2rem + 2vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+.page-lede { margin: 0; color: var(--text-muted); max-width: 62ch; }
+.result-count { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+
+/* ─────────────────────────── chips ─────────────────────────── */
+
+.chip-row {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: var(--space-1);
+  /* Bleed to the viewport edge on phones so the row visibly continues past
+     the screen rather than looking clipped. */
+  margin-inline: calc(var(--space-4) * -1);
+  padding-inline: var(--space-4);
+}
+.chip-row::-webkit-scrollbar { display: none; }
+
+.chip {
+  flex-shrink: 0;
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease);
+}
+.chip:hover { border-color: var(--border-strong); color: var(--text); }
+.chip.is-active {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--paper);
+}
+
+@media (min-width: 768px) {
+  .chip-row { margin-inline: 0; padding-inline: 0; flex-wrap: wrap; overflow: visible; }
+}
+
+/* ─────────────────────────── rails ─────────────────────────── */
+
+.shelf { display: grid; gap: var(--space-4); }
+.shelf-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); }
+.shelf-head h2 { margin: 0; font-size: 1.25rem; letter-spacing: -0.02em; }
+.shelf-more { color: var(--brand); font-size: 0.86rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
+
+.rail {
+  list-style: none;
+  margin: 0 calc(var(--space-4) * -1);
+  padding: var(--space-1) var(--space-4) var(--space-3);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 150px;
+  gap: var(--space-3);
+  overflow-x: auto;
+  /* Snap so a flick always lands on a card edge instead of mid-poster. */
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.rail::-webkit-scrollbar { display: none; }
+.rail-item { scroll-snap-align: start; min-width: 0; }
+
+@media (min-width: 768px) {
+  .rail { margin-inline: 0; padding-inline: 0; grid-auto-columns: 176px; }
+}
+
+/* ─────────────────────────── cards ─────────────────────────── */
+
+/* The card adapts to its slot, not to the window. The same component sits in
+   a 150px rail and a 220px grid cell, and neither context has to know. */
+.catalog-grid > *, .rail-item {
+  container-type: inline-size;
+  container-name: card;
+}
+
+@container card (min-width: 200px) {
+  .card-title { font-size: 0.98rem; }
+  .card-meta { display: flex; }
+}
+@container card (max-width: 199px) {
+  .card-meta { display: none; }
+}
+
+/* ─────────────────────────── schedule ─────────────────────────── */
+
+.day-strip {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-inline: calc(var(--space-4) * -1);
+  padding: var(--space-1) var(--space-4) var(--space-2);
+}
+.day-strip::-webkit-scrollbar { display: none; }
+
+.day-chip {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-width: 72px;
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.day-chip.is-active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.day-chip-label { font-size: 0.82rem; font-weight: 650; white-space: nowrap; }
+.day-chip-count { font-size: 0.72rem; opacity: 0.75; font-variant-numeric: tabular-nums; }
+
+@media (min-width: 768px) {
+  .day-strip { margin-inline: 0; padding-inline: 0; }
+  .day-chip { flex: 1 1 0; }
+}
+
+.schedule-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.schedule-row { display: flex; align-items: stretch; gap: var(--space-3); }
+
+.schedule-time {
+  flex: 0 0 62px;
+  padding-top: var(--space-3);
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-card {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition: border-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+.schedule-card:hover { border-color: var(--border-strong); }
+.schedule-card:active { transform: scale(0.99); }
+
+.schedule-card img, .schedule-cover-blank {
+  width: 46px; height: 64px; flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.schedule-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.schedule-title {
+  font-weight: 620; font-size: 0.94rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.schedule-meta { font-size: 0.8rem; color: var(--text-muted); }
+.schedule-status {
+  font-size: 0.78rem; font-weight: 650; color: var(--brand);
+  font-variant-numeric: tabular-nums;
+}
+.schedule-status.is-out { color: var(--positive); }
+.schedule-flag { color: var(--warning); font-size: 1rem; padding-right: var(--space-2); }
+
+.schedule-skeleton { display: grid; gap: var(--space-2); }
+.schedule-skeleton > * { height: 80px; border-radius: var(--radius-lg); }
+
+/* ─────────────────────────── profile ─────────────────────────── */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+  margin: 0;
+}
+@media (min-width: 640px) { .stat-grid { grid-template-columns: repeat(4, 1fr); } }
+
+.stat {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.stat dt { font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-faint); }
+.stat dd {
+  margin: var(--space-1) 0 0;
+  font-size: clamp(1.3rem, 1rem + 1.5vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.stat-skeleton { height: 92px; border-radius: var(--radius-lg); }
+
+.taste-panel {
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.taste-panel h3 { margin: 0 0 var(--space-4); font-size: 1rem; }
+.taste-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.taste-list li { display: grid; grid-template-columns: 8rem 1fr 2rem; align-items: center; gap: var(--space-3); }
+.taste-name { font-size: 0.87rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.taste-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  position: relative;
+  overflow: hidden;
+}
+.taste-bar::after {
+  content: "";
+  position: absolute; inset: 0 auto 0 0;
+  width: var(--fill, 0%);
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), var(--brand-strong));
+}
+.taste-count { font-size: 0.82rem; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.taste-foot { margin: var(--space-4) 0 0; font-size: 0.83rem; color: var(--text-muted); }
+
+@media (max-width: 520px) {
+  .taste-list li { grid-template-columns: 6rem 1fr 1.6rem; }
+}
+
+.library-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.library-row { display: flex; align-items: center; gap: var(--space-2); }
+.library-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.library-row img { width: 46px; height: 64px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
+.library-copy { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.library-title { font-weight: 620; font-size: 0.94rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library-meta { font-size: 0.8rem; color: var(--text-muted); }
+.library-remove {
+  width: var(--tap-target); height: var(--tap-target);
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-faint);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.library-remove:hover { color: var(--danger); border-color: var(--danger); }
+
+.progress-track { height: 4px; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; }
+.progress-fill { display: block; height: 100%; background: var(--brand); border-radius: 999px; }
+
+.empty-panel {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  padding: var(--space-6);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+}
+.empty-panel h3 { margin: 0; font-size: 1.15rem; }
+.empty-panel p { margin: 0; color: var(--text-muted); max-width: 48ch; }
+
+/* ─────────────────────────── settings ─────────────────────────── */
+
+.settings-group {
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  display: grid;
+  gap: var(--space-4);
+}
+.settings-group h3 { margin: 0; font-size: 1rem; letter-spacing: -0.01em; }
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.setting-copy { display: grid; gap: 2px; flex: 1; min-width: 200px; }
+.setting-label { font-weight: 600; font-size: 0.93rem; }
+.setting-hint { font-size: 0.82rem; color: var(--text-muted); max-width: 52ch; }
+.setting-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.segment {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: calc(var(--radius-md) - 4px);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.segment.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
+.segment:disabled { opacity: 0.5; cursor: default; }
+
+/* A styled track over a real checkbox: keyboard, screen-reader and form
+   behaviour all come free, and only the visuals are custom. */
+.switch { position: relative; display: inline-flex; flex-shrink: 0; cursor: pointer; }
+.switch input {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0; margin: 0; cursor: pointer;
+}
+.switch-track {
+  display: block;
+  width: 50px; height: 30px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background var(--dur) var(--ease);
+}
+.switch-thumb {
+  display: block;
+  width: 24px; height: 24px;
+  margin: 3px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-1);
+  transition: transform var(--dur) var(--ease);
+}
+.switch input:checked + .switch-track { background: var(--brand); }
+.switch input:checked + .switch-track .switch-thumb { transform: translateX(20px); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--brand); outline-offset: 2px; }
+.switch input:disabled + .switch-track { opacity: 0.5; }
+
+/* ─────────────────────────── search page ─────────────────────────── */
+
+.search-wrap-page {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 560px;
+}
+.search-wrap-page input {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+/* ─────────────────────────── hero adjustments ─────────────────────── */
+
+.hero-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center; }
+
+/* Once Continue Watching is on screen the hero is no longer the headline,
+   so it gives back vertical space instead of competing. */
+.hero-compact { padding-block: var(--space-4); }
+.hero-compact h1 { font-size: clamp(1.4rem, 1.1rem + 1.6vw, 2rem); }
+
+/* ─────────────────────────── player gestures ─────────────────────── */
+
+.gesture-layer {
+  position: absolute;
+  /* Stops 64px short of the bottom so the native control bar stays
+     reachable. An overlay across the whole video would swallow every
+     attempt to grab the scrubber, which is the worst thing a gesture
+     layer can do. */
+  inset: 0 0 64px 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+}
+
+/* Pointer devices already have precise controls; the layer must not sit
+   between a cursor and the video. */
+@media (hover: hover) and (pointer: fine) {
+  .gesture-layer { pointer-events: none; }
+}
+
+.gesture-pill {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 108px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: rgba(12, 13, 20, 0.78);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  /* Placed above centre: dead centre is where the eye is already watching
+     the picture, and a pill there hides the thing being seeked through. */
+  align-self: start;
+  margin-top: 18%;
+}
+.gesture-pill-text { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gesture-pill-detail { font-size: 0.8rem; opacity: 0.75; font-variant-numeric: tabular-nums; }
+
+.gesture-bar {
+  display: block;
+  width: 96px; height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  overflow: hidden;
+}
+.gesture-bar > span { display: block; height: 100%; background: #fff; border-radius: 999px; }

@@ -89,7 +89,7 @@ interface AniListImage {
   color?: string | null;
 }
 
-interface AniListMedia {
+export interface AniListMedia {
   id: number;
   idMal: number | null;
   title: { romaji: string | null; english: string | null; native: string | null } | null;

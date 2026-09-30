@@ -8,6 +8,9 @@ import { useQoeSession } from '@/hooks/useQoeSession';
 import { describeQoe } from '@/lib/streams/qoe';
 import type { WorkerRequest, WorkerResponse } from '@/core/stream.worker';
 
+import { PlayerGestureLayer } from '@/components/PlayerGestureLayer';
+import { DEFAULT_PLAYBACK_SETTINGS, readPlaybackSettings } from '@/lib/user-data/settings';
+
 interface MasterPlayerProps {
   mirrors: StreamMirrorNode[];
   poster: string;
@@ -133,12 +136,18 @@ export function MasterPlayer({
   const [pipAvailable, setPipAvailable] = useState(false);
   const [autoSkip, setAutoSkip] = useState(readAutoSkip);
   const [showStats, setShowStats] = useState(false);
+  // Read in an effect, not during render: the server has no localStorage.
+  const [playbackSettings, setPlaybackSettings] = useState(DEFAULT_PLAYBACK_SETTINGS);
   const [stats, setStats] = useState<PlaybackStats | null>(null);
 
   // QoE only recomputes while the stats overlay is open; the event log is
   // always recorded, because a session's start time cannot be reconstructed
   // after the fact.
   const qoe = useQoeSession(showStats);
+  useEffect(() => {
+    setPlaybackSettings(readPlaybackSettings());
+  }, []);
+
   const sessionIdRef = useRef(qoe.sessionId);
   sessionIdRef.current = qoe.sessionId;
   const recordQoe = qoe.record;
@@ -741,6 +750,11 @@ export function MasterPlayer({
           poster={poster}
           crossOrigin="anonymous"
           aria-label={`Video player: ${episodeLabel}`}
+        />
+        <PlayerGestureLayer
+          video={video}
+          enabled={playbackSettings.gesturesEnabled}
+          seekStepSeconds={playbackSettings.seekStepSeconds}
         />
         {skipHint ? (
           <button type="button" className="skip-button" onClick={applySkip}>

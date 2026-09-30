@@ -1,0 +1,592 @@
+/**
+ * Application shell: adaptive navigation, top bar, search palette, theming.
+ *
+ * Layout strategy, stated once:
+ *   - MEDIA queries decide page-level layout and honour OS preferences.
+ *   - CONTAINER queries decide component layout, so a card adapts to the slot
+ *     it is in rather than to the window it happens to be inside.
+ * That split is the whole reason a card can sit in a narrow rail and a wide
+ * grid without either context knowing about the other.
+ */
+
+/* ─────────────────────────── design tokens ─────────────────────────── */
+
+:root {
+  /* Spacing scale, used everywhere instead of magic numbers. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --sidebar-rail: 76px;
+  --sidebar-full: 248px;
+  --topbar-height: 60px;
+  --tabbar-height: 62px;
+
+  /* Touch targets never go below this. WCAG 2.2 target size is 24px minimum;
+     44px is the platform convention and what thumbs actually need. */
+  --tap-target: 44px;
+
+  --surface: #ffffff;
+  --surface-2: #f4f4f8;
+  --surface-sunken: rgba(17, 18, 26, 0.04);
+  --border: rgba(74, 79, 93, 0.14);
+  --border-strong: rgba(74, 79, 93, 0.26);
+  --text: #22232a;
+  --text-muted: #6b6f7b;
+  --text-faint: #9297a3;
+  --brand: #6253a6;
+  --brand-strong: #4f438d;
+  --brand-wash: #ede9fe;
+  --positive: #0f7a5a;
+  --warning: #9a6b1f;
+  --danger: #b4483f;
+
+  --shadow-1: 0 1px 2px rgba(24, 26, 38, 0.06), 0 2px 8px rgba(24, 26, 38, 0.05);
+  --shadow-2: 0 8px 28px rgba(24, 26, 38, 0.10);
+  --shadow-3: 0 24px 64px rgba(24, 26, 38, 0.18);
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+}
+
+/* Dark theme. Applied by OS preference, or forced by the settings page via
+   a data attribute on <html> so the choice survives a reload. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --paper: #0e0f15;
+    --surface: #16181f;
+    --surface-2: #1c1f28;
+    --surface-sunken: rgba(255, 255, 255, 0.05);
+    --border: rgba(255, 255, 255, 0.10);
+    --border-strong: rgba(255, 255, 255, 0.20);
+    --text: #eceef4;
+    --ink: #eceef4;
+    --text-muted: #a2a8b8;
+    --text-faint: #767d8f;
+    --brand: #a996f5;
+    --brand-strong: #c3b6ff;
+    --brand-wash: rgba(139, 122, 226, 0.18);
+    --lavender: rgba(139, 122, 226, 0.20);
+    --mint: rgba(52, 168, 128, 0.18);
+    --line: rgba(255, 255, 255, 0.10);
+    --muted: #a2a8b8;
+    --accent: #a996f5;
+    --accent-strong: #c3b6ff;
+    --positive: #4ecfa0;
+    --warning: #e0b054;
+    --danger: #f0847a;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.5);
+    --shadow-3: 0 24px 64px rgba(0, 0, 0, 0.62);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --paper: #0e0f15;
+  --surface: #16181f;
+  --surface-2: #1c1f28;
+  --surface-sunken: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.20);
+  --text: #eceef4;
+  --ink: #eceef4;
+  --text-muted: #a2a8b8;
+  --text-faint: #767d8f;
+  --brand: #a996f5;
+  --brand-strong: #c3b6ff;
+  --brand-wash: rgba(139, 122, 226, 0.18);
+  --lavender: rgba(139, 122, 226, 0.20);
+  --mint: rgba(52, 168, 128, 0.18);
+  --line: rgba(255, 255, 255, 0.10);
+  --muted: #a2a8b8;
+  --accent: #a996f5;
+  --accent-strong: #c3b6ff;
+  --positive: #4ecfa0;
+  --warning: #e0b054;
+  --danger: #f0847a;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --shadow-3: 0 24px 64px rgba(0, 0, 0, 0.62);
+}
+
+:root[data-theme='dark'] .mesh-backdrop,
+:root:not([data-theme='light']) .mesh-backdrop {
+  opacity: 0.35;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) .mesh-backdrop { opacity: 1; }
+}
+
+/* ─────────────────────────── shell layout ─────────────────────────── */
+
+.app-shell {
+  min-height: 100dvh; /* dvh, not vh: vh ignores mobile browser chrome. */
+  display: flex;
+  background: var(--paper);
+  color: var(--text);
+}
+
+.app-body {
+  flex: 1;
+  min-width: 0; /* Without this a wide grid child refuses to shrink. */
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4)
+           calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-6));
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 100;
+  padding: var(--space-3) var(--space-4);
+  background: var(--brand);
+  color: #fff;
+  border-radius: var(--radius-sm);
+}
+.skip-link:focus {
+  left: var(--space-4);
+  top: var(--space-4);
+}
+
+/* ─────────────────────────── top bar ─────────────────────────── */
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--topbar-height);
+  padding: 0 var(--space-4);
+  padding-top: env(safe-area-inset-top);
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-brand {
+  display: grid;
+  place-items: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  margin-left: calc(var(--space-3) * -1);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.topbar-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  min-width: var(--tap-target);
+  justify-content: center;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.topbar-search:hover { border-color: var(--border-strong); color: var(--text); }
+.topbar-search-text { display: none; font-size: 0.9rem; }
+.topbar-kbd { display: none; }
+
+kbd {
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-faint);
+}
+
+/* ─────────────────────────── sidebar ─────────────────────────── */
+
+.app-sidebar {
+  display: none; /* Mobile uses the tab bar instead. */
+  flex-direction: column;
+  gap: var(--space-4);
+  width: var(--sidebar-rail);
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-2) var(--space-4);
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  text-decoration: none;
+  color: inherit;
+  min-height: var(--tap-target);
+}
+.sidebar-brand-text {
+  display: none;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-size: 1.05rem;
+}
+
+.sidebar-nav, .sidebar-utility { min-width: 0; }
+.sidebar-nav { flex: 1; }
+.sidebar-utility { border-top: 1px solid var(--border); padding-top: var(--space-3); }
+.sidebar-nav ul, .sidebar-utility ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sidebar-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  font-size: 0.93rem;
+  font-weight: 550;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.sidebar-link:hover { background: var(--surface-sunken); color: var(--text); }
+.sidebar-link.is-active { background: var(--brand-wash); color: var(--brand-strong); }
+.sidebar-link.is-active .nav-icon { stroke-width: 2.1; }
+.sidebar-label { display: none; white-space: nowrap; }
+.sidebar-kbd { display: none; margin-left: auto; }
+
+/* Rail tooltips. Only shown when labels are hidden, and only on pointer
+   devices — a tooltip that appears on tap is just a stuck overlay. */
+@media (hover: hover) and (pointer: fine) {
+  .app-sidebar:not(.is-wide) .sidebar-link[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 40;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--text);
+    color: var(--paper);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: var(--shadow-2);
+  }
+}
+
+/* ─────────────────────────── bottom tab bar ─────────────────────────── */
+
+.app-tabbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border);
+  /* The home indicator on modern phones overlaps a naive fixed bar. */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.app-tabbar ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+}
+
+.tab-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: var(--tabbar-height);
+  padding: var(--space-2) var(--space-1);
+  color: var(--text-faint);
+  text-decoration: none;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  /* Removes the grey flash Android/iOS paint over tapped links. */
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--dur-fast) var(--ease);
+}
+.tab-link.is-active { color: var(--brand); }
+.tab-link.is-active .nav-icon {
+  stroke-width: 2.3;
+  /* The active state is carried by weight AND a pill, never colour alone --
+     colour-only states fail for ~8% of men. */
+}
+.tab-link.is-active::before {
+  content: "";
+  position: absolute;
+  margin-top: -34px;
+  width: 30px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--brand);
+}
+.tab-link:active { transform: scale(0.94); }
+.tab-label { line-height: 1; }
+
+/* ─────────────────────────── responsive switch ─────────────────────── */
+
+/* Tablet and up: the thumb is no longer the pointer, so navigation moves off
+   the bottom edge and becomes a rail. */
+@media (min-width: 768px) {
+  .app-sidebar { display: flex; }
+  .app-tabbar { display: none; }
+  .app-main {
+    padding: var(--space-6) var(--space-5) var(--space-7);
+  }
+  .topbar-brand { display: none; }
+  .topbar-search {
+    margin-left: auto;
+    min-width: 260px;
+    justify-content: flex-start;
+  }
+  .topbar-search-text { display: inline; flex: 1; text-align: left; }
+  .topbar-kbd { display: inline-block; }
+}
+
+/* Desktop: room for labels, so the rail becomes a real sidebar. */
+@media (min-width: 1200px) {
+  .app-sidebar {
+    width: var(--sidebar-full);
+    padding: var(--space-5) var(--space-3);
+  }
+  .sidebar-label, .sidebar-brand-text { display: inline; }
+  .sidebar-kbd { display: inline-block; }
+  .app-topbar { padding: 0 var(--space-6); }
+  .app-main { padding: var(--space-6) var(--space-6) var(--space-7); }
+}
+
+/* ─────────────────────────── search overlay ─────────────────────────── */
+
+.search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--space-4);
+  padding-top: max(var(--space-6), 8dvh);
+  background: rgba(12, 13, 20, 0.5);
+  backdrop-filter: blur(6px);
+  animation: overlay-in var(--dur) var(--ease);
+}
+
+.search-panel {
+  width: min(640px, 100%);
+  max-height: min(70dvh, 620px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+  animation: panel-in var(--dur) var(--ease);
+}
+
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+.search-input::-webkit-search-cancel-button { display: none; }
+.search-close {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-faint);
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.search-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+.search-body { overflow-y: auto; overscroll-behavior: contain; padding: var(--space-2); }
+
+.search-section-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+.link-button {
+  border: 0; background: none; color: var(--brand); cursor: pointer;
+  font-size: 0.74rem; text-transform: none; letter-spacing: 0;
+}
+
+.search-recent, .search-results { list-style: none; margin: 0; padding: 0; }
+.search-recent-item, .search-result > button {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-3);
+  border: 0; border-radius: var(--radius-md);
+  background: transparent; color: var(--text);
+  cursor: pointer; text-align: left;
+}
+.search-recent-item:hover, .search-result > button:hover { background: var(--surface-sunken); }
+.search-result.is-highlight > button { background: var(--brand-wash); }
+
+.search-result img, .search-result-blank {
+  width: 40px; height: 56px; flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.search-result-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.search-result-title {
+  font-weight: 600; font-size: 0.93rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.search-result-meta { font-size: 0.78rem; color: var(--text-muted); }
+.search-result-score {
+  font-size: 0.8rem; font-weight: 700; color: var(--positive);
+  font-variant-numeric: tabular-nums;
+}
+
+.search-empty { padding: var(--space-5); text-align: center; color: var(--text-muted); }
+.search-all {
+  width: 100%; min-height: var(--tap-target);
+  margin-top: var(--space-2);
+  border: 0; border-radius: var(--radius-md);
+  background: var(--surface-2); color: var(--brand-strong);
+  font-weight: 600; cursor: pointer;
+}
+
+.search-foot {
+  display: flex; gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  font-size: 0.74rem; color: var(--text-faint);
+}
+.search-foot span { display: inline-flex; align-items: center; gap: 4px; }
+
+@media (max-width: 560px) {
+  .search-foot { display: none; } /* No physical keyboard to hint at. */
+  .search-panel { max-height: 84dvh; }
+  .search-overlay { padding: 0; padding-top: 0; }
+  .search-panel { width: 100%; height: 100dvh; max-height: none; border-radius: 0; border: 0; }
+}
+
+/* ─────────────────────────── motion ─────────────────────────── */
+
+@keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Motion is an enhancement. Honour the OS setting rather than assuming
+   everyone enjoys things flying around. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  @view-transition { navigation: none; }
+}
+
+/* Cross-document view transitions: a real page navigation that feels like an
+   app. Progressive enhancement -- browsers without support simply navigate. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+}
+
+/* ─────────────────────────── footer ─────────────────────────── */
+
+.app-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  justify-content: space-between;
+  padding: var(--space-5) var(--space-4);
+  /* Clears the fixed tab bar and the home indicator below it. */
+  padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-5));
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 0.8rem;
+}
+
+@media (min-width: 768px) {
+  .app-footer { padding: var(--space-5) var(--space-5); }
+}

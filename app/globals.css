@@ -33,8 +33,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .mesh-backdrop {
   position: fixed;
   z-index: -1;
-  inset: -12vh -10vw auto;
-  height: 88vh;
+  inset: -12dvh -10vw auto;
+  height: 88dvh;
   pointer-events: none;
   overflow: hidden;
   background:
