@@ -1,158 +1,43 @@
-// lib/streams/registry.ts
-import { AnimeServerExtractor, StreamSourcePayload, ServerProviderType } from './definitions';
+// app/api/servers/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { CentralStreamRegistry } from '@/lib/streams/registry';
 
-/**
- * Class A: Regular Expression Standard HLS Extractors
- * Handles: Vidplay, MyCloud, MegaF, Vidhide, Streamwish, Voe
- */
-export class StandardHLSMatcher implements AnimeServerExtractor {
-  constructor(
-    public providerType: ServerProviderType,
-    private domains: string[]
-  ) {}
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const targetEmbedUrl = searchParams.get('url');
 
-  canExtract(embedUrl: string): boolean {
-    return this.domains.some(domain => embedUrl.toLowerCase().includes(domain));
-  }
-
-  async extractStreams(embedUrl: string, userAgent: string): Promise<StreamSourcePayload[]> {
-    try {
-      const origin = new URL(embedUrl).origin;
-      const response = await fetch(embedUrl, {
-        headers: { 'User-Agent': userAgent, 'Referer': origin, 'Origin': origin }
-      });
-      const html = await response.text();
-
-      // Universal pattern match for active master playlist manifest strings
-      const hlsRegex = /(?:file|sources?|src|url)\s*:\s*["']([^"']+\.m3u8[^"']*)["']/i;
-      const match = html.match(hlsRegex);
-
-      if (!match) return [];
-
-      return [{
-        url: match[1],
-        quality: 'auto',
-        type: 'hls',
-        headers: { 'Referer': origin, 'User-Agent': userAgent, 'Origin': origin }
-      }];
-    } catch {
-      return [];
+    if (!targetEmbedUrl) {
+      return NextResponse.json(
+        { success: false, error: 'Missing active target server payload URL vector parameter string context specification.' },
+        { status: 400 }
+      );
     }
-  }
-}
 
-/**
- * Class B: IFrame HTML Dom Container Scrapers
- * Handles: Filemoon, NetuTV, Mp4Upload
- */
-export class FrameSourceScraper implements AnimeServerExtractor {
-  constructor(
-    public providerType: ServerProviderType,
-    private domains: string[],
-    private targetFallbackExtension: 'm3u8' | 'mp4' = 'm3u8'
-  ) {}
+    const browserUserAgent = request.headers.get('user-agent') || 
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-  canExtract(embedUrl: string): boolean {
-    return this.domains.some(domain => embedUrl.toLowerCase().includes(domain));
-  }
+    const registry = new CentralStreamRegistry();
+    const resolvedStreams = await registry.resolveAllAvailableServers(targetEmbedUrl, browserUserAgent);
 
-  async extractStreams(embedUrl: string, userAgent: string): Promise<StreamSourcePayload[]> {
-    try {
-      const origin = new URL(embedUrl).origin;
-      const response = await fetch(embedUrl, { headers: { 'User-Agent': userAgent, 'Referer': origin } });
-      const html = await response.text();
-
-      const srcRegex = new RegExp(`["']([^"']+\\.(?:${this.targetFallbackExtension})[^"']*)["']`, 'i');
-      const match = html.match(srcRegex);
-
-      if (!match) return [];
-
-      return [{
-        url: match[1],
-        quality: 'auto',
-        type: this.targetFallbackExtension === 'm3u8' ? 'hls' : 'mp4',
-        headers: { 'Referer': origin, 'User-Agent': userAgent }
-      }];
-    } catch {
-      return [];
+    if (resolvedStreams.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: 'No video configurations found. Trying to parse proxy target links.'
+      }, { status: 422 });
     }
-  }
-}
 
-/**
- * Class C: Dedicated Split Variable Matchers
- * Handles: Doodstream, Streamtape
- */
-export class TokenCompositionScraper implements AnimeServerExtractor {
-  constructor(
-    public providerType: ServerProviderType,
-    private domains: string[]
-  ) {}
+    return NextResponse.json({
+      success: true,
+      hostNode: new URL(targetEmbedUrl).hostname,
+      streams: resolvedStreams
+    });
 
-  canExtract(embedUrl: string): boolean {
-    return this.domains.some(domain => embedUrl.toLowerCase().includes(domain));
-  }
-
-  async extractStreams(embedUrl: string, userAgent: string): Promise<StreamSourcePayload[]> {
-    try {
-      const origin = new URL(embedUrl).origin;
-      const response = await fetch(embedUrl, { headers: { 'User-Agent': userAgent, 'Referer': origin } });
-      const html = await response.text();
-
-      // Matches dynamic multi-token strings constructed inside standard custom video players
-      const tokenRegex = /document\.getElementById\(['"](?:streamvideo\vert{}ideolink)['"]\)\.src\s*=\s*["']([^"']+)["']\s*\+\s*['"]([^'"]+)['"]/i;
-      const match = html.match(tokenRegex);
-
-      if (!match) {
-        const singleUrlRegex = /data-video=["']([^"']+)["']/i;
-        const fallbackMatch = html.match(singleUrlRegex);
-        if (!fallbackMatch) return [];
-        return [{ url: fallbackMatch[1], quality: 'auto', type: 'mp4', headers: { 'Referer': origin } }];
-      }
-
-      return [{
-        url: `${match[1]}${match[2]}`,
-        quality: 'auto',
-        type: 'mp4',
-        headers: { 'Referer': origin, 'User-Agent': userAgent }
-      }];
-    } catch {
-      return [];
-    }
-  }
-}
-
-/**
- * Master Registry Controller Engine managing all 11 active servers simultaneously
- */
-export class CentralStreamRegistry {
-  private extractors: AnimeServerExtractor[] = [];
-
-  constructor() {
-    // 1. Direct Regex HLS Extractors
-    this.extractors.push(new StandardHLSMatcher('VIDPLAY', ['vidplay', 'vizcloud']));
-    this.extractors.push(new StandardHLSMatcher('MYCLOUD', ['mycloud', 'mcloud']));
-    this.extractors.push(new StandardHLSMatcher('MEGAF', ['megaf', 'megaf.cc']));
-    this.extractors.push(new StandardHLSMatcher('VIDHIDE', ['vidhide', 'vidsrc']));
-    this.extractors.push(new StandardHLSMatcher('STREAMWISH', ['streamwish', 'strwish', 'awish']));
-    this.extractors.push(new StandardHLSMatcher('VOE', ['voe', 'voe.sx']));
-
-    // 2. IFrame DOM / Resource Track Scrapers
-    this.extractors.push(new FrameSourceScraper('FILEMOON', ['filemoon', 'fmoon'], 'm3u8'));
-    this.extractors.push(new FrameSourceScraper('NETUTV', ['netu', 'waaw', 'netutv'], 'm3u8'));
-    this.extractors.push(new FrameSourceScraper('MP4UPLOAD', ['mp4upload'], 'mp4'));
-
-    // 3. Token Combination Scrapers
-    this.extractors.push(new TokenCompositionScraper('DOODSTREAM', ['doodstream', 'dood.to', 'dood.watch']));
-    this.extractors.push(new TokenCompositionScraper('STREAMTAPE', ['streamtape', 'stape']));
-  }
-
-  async resolveAllAvailableServers(embedUrl: string, userAgent: string): Promise<StreamSourcePayload[]> {
-    for (const extractor of this.extractors) {
-      if (extractor.canExtract(embedUrl)) {
-        return await extractor.extractStreams(embedUrl, userAgent);
-      }
-    }
-    return [];
+  } catch (error: any) {
+    console.error('[API Server Registry Route Exception]: Fault on stream resolution block.', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal pipeline fault during multi-server context extraction runtime calculation loops.' },
+      { status: 500 }
+    );
   }
 }
