@@ -35,12 +35,13 @@ The slot activates on restart; no player code change is required.
 | --- | --- |
 | Catalog | AniList GraphQL → Jikan/MyAnimeList → bundled offline sample. Browse trending / popular / top rated / seasonal / upcoming, search, and filter by genre, format, season and year. |
 | Titles | Synopsis, studios, score, tags, relations, full episode lists (chunked for 1000+ episode shows), official streaming links and trailers. |
-| Playback | Ranked mirror list per episode, off-main-thread probing, hls.js with network/media error recovery, automatic failover, manual server switching, quality selection. |
+| Playback | Ranked mirror list per episode, off-main-thread **hedged parallel racing** with a health-aware circuit breaker, hls.js with network/media error recovery, position-preserving failover, manual server switching, quality selection. |
 | Media proxy | Same-origin HLS gateway with a derived host allowlist, per-hop redirect re-checks, manifest rewriting, range and content-encoding correctness. |
 | Watch rooms | Private Supabase Broadcast channels, four-timestamp clock sync, drift correction. |
 
 Deeper notes: [`docs/ANIME-SOURCES.md`](docs/ANIME-SOURCES.md),
 [`docs/STREAM-SERVERS.md`](docs/STREAM-SERVERS.md),
+[`docs/FAILOVER.md`](docs/FAILOVER.md),
 [`docs/STREAM-SERVER-RESEARCH.md`](docs/STREAM-SERVER-RESEARCH.md),
 [`docs/ROOM-SYNC.md`](docs/ROOM-SYNC.md), and
 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
@@ -90,10 +91,25 @@ grouped and labelled as `Reference` in the UI, and switch off with
 `ANIVERSE_ENABLE_REFERENCE_STREAMS=false`.
 
 > Configure only sources you own, operate, or are licensed to distribute from.
-> This repository deliberately ships no content servers and no extractors for
-> third-party file hosts. For discovering where a title is legally streamable,
-> the catalog surfaces AniList's official `streamingEpisodes` links and
-> trailers on each episode.
+> The supported model is direct HLS/MP4 from origins under your control. For
+> discovering where a title is legally streamable, the catalog surfaces
+> AniList's official `streamingEpisodes` links and trailers on each episode.
+
+### The `server/` directory
+
+`server/` holds an experimental Express bridge that queries a
+[Consumet](https://github.com/consumet/api.consumet.org) instance. **It is not
+wired into the default configuration and it does not work as shipped:**
+Consumet discontinued its public API — their README now states *"Consumet API
+is no longer publicly available… host your own instance"* — while
+`server/index.js` still defaults to `https://api.consumet.org`. It is also
+outside the root `lint`, `typecheck` and `test` scripts, and `npm run dev`
+does not start it.
+
+`config/stream-servers.json` therefore ships the same dormant paste brackets
+as the example file, so a fresh checkout has a coherent default: no configured
+servers, reference streams playing, and the `/servers` page explaining how to
+add your own.
 
 ## Media proxy
 

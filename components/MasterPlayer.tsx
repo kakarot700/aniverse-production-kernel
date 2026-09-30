@@ -26,6 +26,30 @@ interface QualityLevel {
 
 const MAX_MEDIA_RECOVERIES = 2;
 
+/**
+ * The server that last worked is remembered across episodes and reloads, so a
+ * viewer who found a good mirror is not re-raced onto a worse one every time.
+ * The worker still overrides this if that server is in its cooldown window.
+ */
+const PREFERRED_SERVER_KEY = 'aniverse:preferred-server';
+
+function readPreferredServerId(): string | null {
+  try {
+    return window.localStorage.getItem(PREFERRED_SERVER_KEY);
+  } catch {
+    // Private mode or a blocked storage partition; preference is optional.
+    return null;
+  }
+}
+
+function writePreferredServerId(id: string): void {
+  try {
+    window.localStorage.setItem(PREFERRED_SERVER_KEY, id);
+  } catch {
+    // Ignore: losing the preference only costs one extra probe next time.
+  }
+}
+
 function describeLevel(level: Level, index: number): QualityLevel {
   const height = level.height ? `${level.height}p` : `${Math.round((level.bitrate ?? 0) / 1000)} kbps`;
   return { index, label: height };
@@ -123,12 +147,20 @@ export function MasterPlayer({
     let lastProgressAt = 0;
     let lastSkipPoint: 'intro' | 'outro' | '' = '';
     let disposed = false;
+    // Where to pick playback back up after a mid-episode server switch, so a
+    // failover costs a buffering pause rather than restarting the episode.
+    let resumeAtSeconds = 0;
+    let pendingSeek: (() => void) | null = null;
 
     const send = (message: WorkerRequest) => {
       if (!disposed) worker.postMessage(message);
     };
 
     const releaseHls = () => {
+      if (pendingSeek) {
+        video.removeEventListener('loadedmetadata', pendingSeek);
+        pendingSeek = null;
+      }
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
@@ -144,9 +176,34 @@ export function MasterPlayer({
     const failover = () => {
       const index = activeIndexRef.current;
       if (index == null) return;
+      // Capture the playhead *before* tearing the source down; after
+      // `load()` the element reports 0 and the position is gone.
+      const position = video.currentTime;
+      if (Number.isFinite(position) && position > 1) resumeAtSeconds = position;
       releaseHls();
       attachedUrl = '';
       send({ type: 'TRY_NEXT_MIRROR', payload: { requestId, fromIndex: index } });
+    };
+
+    const armResumeSeek = () => {
+      if (resumeAtSeconds <= 0) return;
+      const target = resumeAtSeconds;
+      const seek = () => {
+        pendingSeek = null;
+        resumeAtSeconds = 0;
+        // A shorter re-encode on another mirror must not seek past the end.
+        const duration = video.duration;
+        const safeTarget = Number.isFinite(duration) && duration > 0 ? Math.min(target, duration - 1) : target;
+        if (safeTarget <= 0) return;
+        try {
+          video.currentTime = safeTarget;
+        } catch {
+          // Some sources reject a seek before the first fragment lands; the
+          // viewer keeps playback from the start rather than losing the stream.
+        }
+      };
+      pendingSeek = seek;
+      video.addEventListener('loadedmetadata', seek, { once: true });
     };
 
     const attachSource = (url: string, index: number) => {
@@ -154,6 +211,7 @@ export function MasterPlayer({
       attachedUrl = url;
       mediaRecoveries = 0;
       releaseHls();
+      armResumeSeek();
 
       const mirror = mirrorsRef.current[index];
       const isProgressive = mirror?.kind === 'mp4';
@@ -227,12 +285,25 @@ export function MasterPlayer({
         activeIndexRef.current = message.payload.index;
         callbacksRef.current.onActiveMirrorChange?.(message.payload.index);
         setFatalError('');
+        writePreferredServerId(message.payload.id);
+        const raced =
+          message.payload.attempts > 1 ? ` (won a ${message.payload.attempts}-way race)` : '';
         setStatus(
           message.payload.probed
-            ? `${message.payload.name} responded in ${message.payload.latencyMs} ms.`
+            ? `${message.payload.name} responded in ${message.payload.latencyMs} ms${raced}.`
             : `Playing from ${message.payload.name}.`,
         );
         attachSource(message.payload.url, message.payload.index);
+        return;
+      }
+
+      if (message.type === 'RACE_PROGRESS') {
+        if (activeIndexRef.current === null && message.payload.inFlight > 0) {
+          setStatus(
+            `Racing ${message.payload.inFlight} server${message.payload.inFlight === 1 ? '' : 's'}…` +
+              (message.payload.remaining > 0 ? ` ${message.payload.remaining} in reserve.` : ''),
+          );
+        }
         return;
       }
 
@@ -293,12 +364,13 @@ export function MasterPlayer({
       type: 'INITIALIZE_STREAM',
       payload: {
         requestId,
-        startIndex: 0,
+        preferredId: readPreferredServerId(),
         mirrors: currentMirrors.map((mirror) => ({
           id: mirror.id,
           name: mirror.serverName,
           url: playbackUrlFor(mirror),
           probe: isProbeable(mirror),
+          priority: mirror.priority,
         })),
       },
     });
