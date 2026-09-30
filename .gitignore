@@ -9,4 +9,3 @@ coverage/
 .env.*
 !.env.example
 .DS_Store
-config/stream-servers.json

@@ -66,7 +66,10 @@ expands each server's URL template for the requested title and episode, drops
 anything that is not a safe public HTTPS endpoint, sorts by priority, and hands
 the result to the player, which probes each mirror and fails over on error.
 
-Configure your own with `ANIVERSE_STREAM_SERVERS` (inline JSON) or
+The zero-config way to add yours: paste the URL into the bracket file
+**`config/stream-servers.json`** (auto-detected) and restart —
+the in-app **`/servers`** page shows the registry status and the exact JSON to
+copy. Environment alternatives are `ANIVERSE_STREAM_SERVERS` (inline JSON) and
 `ANIVERSE_STREAM_SERVERS_FILE` — see
 [`docs/STREAM-SERVERS.md`](docs/STREAM-SERVERS.md) and
 `config/stream-servers.example.json`.

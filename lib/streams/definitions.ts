@@ -144,6 +144,14 @@ export const REFERENCE_SERVERS: StreamServerDefinition[] = [
   },
 ];
 
+/**
+ * Swaps every `{token}` for a harmless placeholder so a template can be
+ * validated as a URL before any real title identifiers exist.
+ */
+function replaceTokensForValidation(template: string): string {
+  return template.replace(TOKEN_PATTERN, 'x');
+}
+
 export function padEpisode(episode: number, width: number): string {
   return String(Math.max(0, Math.trunc(episode))).padStart(width, '0');
 }
@@ -291,6 +299,29 @@ export function parseServerDefinitions(raw: unknown): {
     }
     if (scope === 'mapped' && Object.keys(titles).length === 0) {
       issues.push({ index, id, message: 'Mapped servers need a non-empty "titles" map.' });
+      return;
+    }
+
+    // URL quality gate. A template that can never expand into a safe public
+    // HTTPS endpoint (a paste bracket still holding its placeholder, an
+    // `http://` origin, an IP literal, …) would silently produce no mirrors,
+    // so it is reported and dropped instead.
+    if (template && !isSafeMediaEndpoint(replaceTokensForValidation(template))) {
+      issues.push({
+        index,
+        id,
+        message: `"template" must be a public HTTPS URL (https://host/…), optionally with {slug}/{episode} tokens.`,
+      });
+      return;
+    }
+    for (const [key, url] of Object.entries(titles)) {
+      if (!isSafeMediaEndpoint(replaceTokensForValidation(url))) {
+        issues.push({ index, id, message: `"titles" entry "${key}" is not a public HTTPS URL; it was removed.` });
+        delete titles[key];
+      }
+    }
+    if (scope === 'mapped' && Object.keys(titles).length === 0) {
+      issues.push({ index, id, message: 'Every "titles" URL was invalid; the server was dropped.' });
       return;
     }
 

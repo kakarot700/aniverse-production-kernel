@@ -1,0 +1,24 @@
+[
+  {
+    "id": "my-anime-sub",
+    "name": "My Anime Server (Sub)",
+    "group": "Licensed",
+    "language": "sub",
+    "kind": "hls",
+    "priority": 10,
+    "enabled": true,
+    "scope": "universal",
+    "template": "PASTE-YOUR-SUB-HLS-URL-HERE"
+  },
+  {
+    "id": "my-anime-files",
+    "name": "My Files (MP4)",
+    "group": "Self-hosted",
+    "language": "raw",
+    "kind": "mp4",
+    "priority": 40,
+    "enabled": true,
+    "scope": "universal",
+    "template": "PASTE-YOUR-MP4-URL-HERE"
+  }
+]

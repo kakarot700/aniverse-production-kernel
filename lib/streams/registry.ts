@@ -9,7 +9,8 @@
  * Configuration precedence:
  *  1. `ANIVERSE_STREAM_SERVERS`      – JSON array of server definitions
  *  2. `ANIVERSE_STREAM_SERVERS_FILE` – path to a JSON file with the same shape
- *  3. built-in public reference streams (unless disabled)
+ *  3. `config/stream-servers.json`   – auto-detected paste file (gitignored)
+ *  4. built-in public reference streams (unless disabled)
  */
 import type { AnimeDetail, AnimeSummary } from '@/types/anime';
 import type { StreamMirrorNode } from '@/types/media';
@@ -29,7 +30,27 @@ export interface RegistrySnapshot {
   referenceStreamsEnabled: boolean;
   configuredCount: number;
   allowedHosts: string[];
-  loadedFrom: 'env' | 'file' | 'none';
+  loadedFrom: 'env' | 'file' | 'default-file' | 'none';
+}
+
+/**
+ * Config file auto-detected when neither `ANIVERSE_STREAM_SERVERS` nor
+ * `ANIVERSE_STREAM_SERVERS_FILE` is set: drop your server list at
+ * `config/stream-servers.json` (already gitignored, so signed URLs never get
+ * committed) and it is picked up with zero environment configuration.
+ */
+export const DEFAULT_SERVERS_FILE = 'config/stream-servers.json';
+
+/**
+ * `undefined` – auto-detect `${process.cwd()}/${DEFAULT_SERVERS_FILE}`.
+ * `string`   – probe that path instead (tests point this at fixtures).
+ * `null`     – never auto-detect (tests keep the registry hermetic).
+ */
+let defaultServersFileOverride: string | null | undefined;
+
+/** Test/seeding hook for the auto-detected config path; production never needs it. */
+export function setDefaultServersFile(path: string | null | undefined): void {
+  defaultServersFileOverride = path;
 }
 
 let snapshot: RegistrySnapshot | null = null;
@@ -42,6 +63,27 @@ function readFileConfig(path: string): { value: unknown; error?: string } {
     return { value: JSON.parse(fs.readFileSync(path, 'utf8')) };
   } catch (error) {
     return { value: null, error: error instanceof Error ? error.message : 'Unreadable file.' };
+  }
+}
+
+function fileExists(path: string): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('node:fs') as typeof import('node:fs');
+    return fs.existsSync(path);
+  } catch {
+    return false;
+  }
+}
+
+function defaultServersFilePath(): string | null {
+  if (defaultServersFileOverride !== undefined) return defaultServersFileOverride;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const nodePath = require('node:path') as typeof import('node:path');
+    return nodePath.join(process.cwd(), DEFAULT_SERVERS_FILE);
+  } catch {
+    return null;
   }
 }
 
@@ -88,6 +130,22 @@ function buildSnapshot(): RegistrySnapshot {
       configured = parsed.servers;
       issues.push(...parsed.issues);
       loadedFrom = 'file';
+    }
+  } else {
+    // Zero-config path: an operator who drops a file at config/stream-servers.json
+    // never needs to touch an environment variable. A missing file is not an
+    // error — a fresh checkout simply falls through to the reference streams.
+    const defaultPath = defaultServersFilePath();
+    if (defaultPath && fileExists(defaultPath)) {
+      const file = readFileConfig(defaultPath);
+      if (file.error) {
+        issues.push({ index: -1, id: '', message: `${DEFAULT_SERVERS_FILE} could not be read: ${file.error}` });
+      } else {
+        const parsed = parseServerDefinitions(file.value);
+        configured = parsed.servers;
+        issues.push(...parsed.issues);
+        loadedFrom = 'default-file';
+      }
     }
   }
 

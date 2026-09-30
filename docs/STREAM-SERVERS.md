@@ -46,11 +46,49 @@ group with a notice on the player. Turn them off once real servers exist:
 ANIVERSE_ENABLE_REFERENCE_STREAMS=false
 ```
 
+## Quick start: paste your URL
+
+The zero-config way needs no environment variable at all:
+
+1. Open **`config/stream-servers.json`** in the project root. It ships with
+   placeholder brackets; the app auto-detects it. (If your URLs contain
+   signing paths you would rather keep out of git, add the file to
+   `.gitignore` in your own deployment — the app does not care either way.)
+2. Paste your stream URL into a `template` bracket.
+3. Restart the app. The registry is read once per process.
+4. Open **`/servers`** in the app (or `GET /api/servers`) and confirm your
+   server is listed with no issues.
+
+```json
+[
+  {
+    "id": "my-anime",
+    "name": "My Anime Server",
+    "group": "Licensed",
+    "language": "sub",
+    "kind": "hls",
+    "priority": 10,
+    "enabled": true,
+    "template": "https://your-cdn.example.com/anime/{slug}/{episode}/index.m3u8"
+  }
+]
+```
+
+A bare URL with no tokens serves that one video for every episode — exactly
+what the reference streams do. Tokens (`{slug}`, `{episode}`, …) make the URL
+per-episode; the full table is below.
+
+A URL that is not a public HTTPS endpoint (an unfilled bracket, `http://`, an
+IP literal, `localhost`) is rejected with a reason on `/servers`, so a typo
+can never silently produce a dead mirror.
+
 ## Adding your own servers
 
 Set `ANIVERSE_STREAM_SERVERS` to a JSON array, or point
 `ANIVERSE_STREAM_SERVERS_FILE` at a JSON file with the same shape (see
-`config/stream-servers.example.json`).
+`config/stream-servers.example.json`). Or use neither: a file at the
+auto-detected `config/stream-servers.json` is picked up with zero environment
+configuration, as described in the quick start above.
 
 ```json
 [
@@ -124,10 +162,12 @@ AniList-only record) simply produces no mirror instead of a broken URL.
 
 ## Validation and safety
 
-* A definition is dropped — with a reason reported on `GET /api/servers` —
-  if it has no `id`, duplicates one, is missing a `template`, or declares
-  `scope: "mapped"` with an empty `titles` map. One bad entry never takes the
-  registry down.
+* A definition is dropped — with a reason reported on `GET /api/servers` and
+  on the `/servers` page — if it has no `id`, duplicates one, is missing a
+  `template`, declares `scope: "mapped"` with an empty `titles` map, or its
+  `template`/`titles` URL is not a public HTTPS endpoint (an unfilled paste
+  bracket, `http://`, an IP literal, credentials, a `.local` name). One bad
+  entry never takes the registry down.
 * Expanded URLs must be HTTPS, on port 443, credential-free, and not a
   loopback/IP/`.local`/`.internal` host.
 * The media proxy allowlist is **derived**: it is

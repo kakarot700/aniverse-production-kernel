@@ -122,6 +122,50 @@ test('a non-array configuration is rejected with a single clear issue', () => {
   assert.match(issues[0].message, /JSON array/);
 });
 
+test('paste-bracket placeholders and non-HTTPS templates are dropped with a clear reason', () => {
+  const { servers, issues } = parseServerDefinitions([
+    { id: 'bracket', name: 'Bracket', template: 'PASTE-YOUR-URL-HERE' },
+    { id: 'insecure', name: 'Insecure', template: 'http://cdn.example.com/{episode}.m3u8' },
+    { id: 'ip-host', name: 'IP Host', template: 'https://203.0.113.7/{episode}.m3u8' },
+    { id: 'good', name: 'Good', template: 'https://cdn.example.com/{slug}/{episode}.m3u8' },
+    { id: 'good-static', name: 'Good Static', template: 'https://cdn.example.com/static/master.m3u8' },
+  ]);
+
+  assert.deepEqual(servers.map((server) => server.id), ['good', 'good-static']);
+  assert.equal(issues.length, 3);
+  assert.ok(issues.every((issue) => /public HTTPS URL/.test(issue.message)));
+  assert.ok(issues.some((issue) => issue.id === 'bracket'), 'the unfilled bracket must be pointed at by id');
+});
+
+test('mapped titles with unsafe URLs are removed individually and reported', () => {
+  const { servers, issues } = parseServerDefinitions([
+    {
+      id: 'mapped',
+      scope: 'mapped',
+      titles: {
+        'anilist:21': 'https://ok.example.com/{episode}.m3u8',
+        'anilist:22': 'http://bad.example.com/{episode}.m3u8',
+        'anilist:23': 'PASTE-URL-HERE',
+      },
+    },
+  ]);
+
+  assert.deepEqual(servers.map((server) => server.id), ['mapped']);
+  assert.deepEqual(Object.keys(servers[0].titles ?? {}), ['anilist:21']);
+  assert.equal(issues.length, 2);
+  assert.ok(issues.every((issue) => /public HTTPS URL/.test(issue.message)));
+});
+
+test('a mapped server whose every URL is unsafe is dropped entirely', () => {
+  const { servers, issues } = parseServerDefinitions([
+    { id: 'mapped-bad', scope: 'mapped', titles: { 'anilist:21': 'http://bad.example.com/{episode}.m3u8' } },
+  ]);
+  assert.deepEqual(servers, []);
+  assert.equal(issues.length, 2);
+  assert.match(issues[0].message, /public HTTPS URL/);
+  assert.match(issues[1].message, /server was dropped/);
+});
+
 test('mirrors resolve in priority order, deduplicated, honouring mapped scope', () => {
   const mirrors = resolveEpisodeMirrors(
     [
