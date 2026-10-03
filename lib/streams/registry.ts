@@ -156,3 +156,21 @@ export class CentralStreamRegistry {
     return [];
   }
 }
+
+export const DEFAULT_SERVER_CONFIG_FILE = 'config/stream-servers.json';
+
+export function getRegistry() {
+  return new CentralStreamRegistry();
+}
+
+export function getEpisodeMirrors(definitions: any[], tokens: any, episode: number, titleKeys: string[]) {
+  return [];
+}
+
+export function getAllowedMediaHosts(definitions: any[]): string[] {
+  return [];
+}
+
+export function describeServers(definitions: any[]): any[] {
+  return [];
+}

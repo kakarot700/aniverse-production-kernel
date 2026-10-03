@@ -1,15 +1,19 @@
 {
   "streamServers": [
-    { "id": "srv_vidplay", "name": "Vidplay", "type": "VIDPLAY", "baseUrl": "https://vidplay.site", "priority": 1, "isActive": true },
-    { "id": "srv_mycloud", "name": "MyCloud", "type": "MYCLOUD", "baseUrl": "https://mycloud.click", "priority": 2, "isActive": true },
-    { "id": "srv_filemoon", "name": "Filemoon", "type": "FILEMOON", "baseUrl": "https://filemoon.sx", "priority": 3, "isActive": true },
-    { "id": "srv_megaf", "name": "MegaF", "type": "MEGAF", "baseUrl": "https://megaf.cc", "priority": 4, "isActive": true },
-    { "id": "srv_vidhide", "name": "Vidhide", "type": "VIDHIDE", "baseUrl": "https://vidhide.to", "priority": 5, "isActive": true },
-    { "id": "srv_mp4upload", "name": "Mp4Upload", "type": "MP4UPLOAD", "baseUrl": "https://mp4upload.com", "priority": 6, "isActive": true },
-    { "id": "srv_streamwish", "name": "Streamwish", "type": "STREAMWISH", "baseUrl": "https://streamwish.to", "priority": 7, "isActive": true },
-    { "id": "srv_doodstream", "name": "Doodstream", "type": "DOODSTREAM", "baseUrl": "https://dood.to", "priority": 8, "isActive": true },
-    { "id": "srv_streamtape", "name": "Streamtape", "type": "STREAMTAPE", "baseUrl": "https://streamtape.com", "priority": 9, "isActive": true },
-    { "id": "srv_voe", "name": "Voe", "type": "VOE", "baseUrl": "https://voe.sx", "priority": 10, "isActive": true },
-    { "id": "srv_netutv", "name": "NetuTV", "type": "NETUTV", "baseUrl": "https://waaw.to", "priority": 11, "isActive": true }
+    { "id": "srv_hianime", "name": "HiAnime", "type": "HIANIME", "baseUrl": "https://hianime.to", "priority": 1, "isActive": true, "requiresProxy": true },
+    { "id": "srv_gogoanime", "name": "GogoAnime", "type": "GOGOANIME", "baseUrl": "https://gogoanime3.co", "priority": 2, "isActive": true, "requiresProxy": true },
+    { "id": "srv_zoro", "name": "Zoro", "type": "ZORO", "baseUrl": "https://zoro.to", "priority": 3, "isActive": true, "requiresProxy": true },
+    { "id": "srv_enime", "name": "Enime", "type": "ENIME", "baseUrl": "https://api.enime.moe", "priority": 4, "isActive": true, "requiresProxy": false },
+    { "id": "srv_vidplay", "name": "Vidplay", "type": "VIDPLAY", "baseUrl": "https://vidplay.site", "priority": 10, "isActive": true },
+    { "id": "srv_mycloud", "name": "MyCloud", "type": "MYCLOUD", "baseUrl": "https://mycloud.click", "priority": 11, "isActive": true },
+    { "id": "srv_filemoon", "name": "Filemoon", "type": "FILEMOON", "baseUrl": "https://filemoon.sx", "priority": 12, "isActive": true },
+    { "id": "srv_megaf", "name": "MegaF", "type": "MEGAF", "baseUrl": "https://megaf.cc", "priority": 13, "isActive": true },
+    { "id": "srv_vidhide", "name": "Vidhide", "type": "VIDHIDE", "baseUrl": "https://vidhide.to", "priority": 14, "isActive": true },
+    { "id": "srv_mp4upload", "name": "Mp4Upload", "type": "MP4UPLOAD", "baseUrl": "https://mp4upload.com", "priority": 15, "isActive": true },
+    { "id": "srv_streamwish", "name": "Streamwish", "type": "STREAMWISH", "baseUrl": "https://streamwish.to", "priority": 16, "isActive": true },
+    { "id": "srv_doodstream", "name": "Doodstream", "type": "DOODSTREAM", "baseUrl": "https://dood.to", "priority": 17, "isActive": true },
+    { "id": "srv_streamtape", "name": "Streamtape", "type": "STREAMTAPE", "baseUrl": "https://streamtape.com", "priority": 18, "isActive": true },
+    { "id": "srv_voe", "name": "Voe", "type": "VOE", "baseUrl": "https://voe.sx", "priority": 19, "isActive": true },
+    { "id": "srv_netutv", "name": "NetuTV", "type": "NETUTV", "baseUrl": "https://waaw.to", "priority": 20, "isActive": true }
   ]
 }
