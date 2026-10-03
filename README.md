@@ -89,12 +89,9 @@ sync are all verifiable before you plug anything in. They rank last, are
 grouped and labelled as `Reference` in the UI, and switch off with
 `ANIVERSE_ENABLE_REFERENCE_STREAMS=false`.
 
-> Configure only media sources you own or operate, or have permission to use
-> and distribute through this app. This repository ships no content servers or
-> extractors for third-party file hosts or consumer streaming services. A
-> subscription does not grant permission to extract or retransmit a service's
-> manifests through another app. The catalog surfaces official episode links
-> and trailers supplied by AniList.
+> Use only media sources you own or operate, or have permission to use and
+> distribute through this app. The catalog surfaces official episode links and
+> trailers supplied by AniList.
 
 ## Media proxy
 

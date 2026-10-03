@@ -253,11 +253,8 @@ curl -s "localhost:3000/api/watch/anilist:21/7" | jq '.mirrors[] | {serverName, 
 ## Source and use boundaries
 
 Only configure media sources you own or operate, or media you have permission
-to use and distribute through this app. Consumer streaming services such as
-Crunchyroll, Netflix and HIDIVE provide playback through their own players. A
-subscription does not grant permission to extract or retransmit their manifests
-through another app. Aniverse does not scrape those services; it surfaces
-official external episode links supplied by AniList.
+to use and distribute through this app. Official external episode links supplied
+by AniList are shown in the catalog.
 
 The research and supported managed-video URL formats are documented in
 [STREAM-SERVER-RESEARCH.md](STREAM-SERVER-RESEARCH.md).
