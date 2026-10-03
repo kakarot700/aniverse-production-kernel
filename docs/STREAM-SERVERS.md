@@ -26,8 +26,8 @@ components/MasterPlayer.tsx  hls.js/native MP4 playback
 
 ## Fastest setup: 12 URL slots
 
-Copy the environment file and paste a licensed HLS/MP4 URL or URL template into
-any of the 12 prepared slots:
+Copy the environment file and paste an HLS/MP4 URL or URL template that you own
+or have permission to use into any of the 12 prepared slots:
 
 ```sh
 cp .env.example .env.local
@@ -41,7 +41,7 @@ ANIVERSE_ENABLE_REFERENCE_STREAMS=false
 ```
 
 A non-empty slot activates on restart. Nothing else is required. Quick slots
-are named `Anime Server 01` … `Anime Server 12`, use the `Licensed` group,
+are named `Anime Server 01` … `Anime Server 12`, use the app's built-in group,
 default to mixed audio and proxy through this app. A URL ending in `.mp4` is
 automatically marked as progressive MP4; every other quick URL is HLS.
 
@@ -65,7 +65,6 @@ Even faster: no environment file at all. The tracked
   {
     "id": "my-anime-sub",
     "name": "My Anime Server (Sub)",
-    "group": "Licensed",
     "language": "sub",
     "kind": "hls",
     "priority": 10,
@@ -116,7 +115,6 @@ Use this when your storage keys follow one convention:
 {
   "id": "studio-cdn-sub",
   "name": "Studio CDN",
-  "group": "Licensed",
   "language": "sub",
   "kind": "hls",
   "priority": 10,
@@ -136,7 +134,6 @@ follow a pattern:
 {
   "id": "partner-dub",
   "name": "Partner CDN (dub)",
-  "group": "Licensed",
   "language": "dub",
   "kind": "hls",
   "priority": 20,
@@ -159,7 +156,6 @@ directly; exact episode entries take precedence over a `titles` fallback:
 {
   "id": "managed-video",
   "name": "Managed video library",
-  "group": "Licensed",
   "language": "mixed",
   "kind": "hls",
   "priority": 5,
@@ -184,7 +180,7 @@ component with a playback URL for media you control.
 | --- | --- | --- |
 | `id` | yes | Stable slug, unique across the registry |
 | `name` | — | Label shown on the server button (defaults to `id`) |
-| `group` | — | UI grouping header (default `Licensed`) |
+| `group` | — | Optional UI grouping header; omit it to use the app's built-in group |
 | `language` | — | `sub` \| `dub` \| `raw` \| `mixed` (default `sub`) |
 | `kind` | — | `hls` \| `mp4` (default `hls`) |
 | `priority` | — | Lower tries first; reference streams sit at 900+ |
@@ -221,7 +217,7 @@ than producing a malformed URL.
 
 ## What ships by default
 
-A fresh checkout has no licensed anime media. It therefore includes five
+A fresh checkout includes no anime media. It therefore includes five
 clearly labelled **reference streams** from Mux, Apple, Unified Streaming and
 the Blender Foundation. They verify HLS, MP4, proxying and failover, but they
 are not anime and always rank last. Disable them after adding real media:
@@ -254,13 +250,14 @@ curl -s localhost:3000/api/servers | jq
 curl -s "localhost:3000/api/watch/anilist:21/7" | jq '.mirrors[] | {serverName, manifestUrl, requiresProxy}'
 ```
 
-## Licensing boundary
+## Source and use boundaries
 
-Only configure media you own, operate, or are licensed to distribute. Consumer
-services such as Crunchyroll, Netflix and HIDIVE expose watch pages for their
-own players; a subscriber account does not grant permission to extract and
-retransmit their manifests through another app. Aniverse surfaces legal
-external episode links supplied by AniList instead of scraping those services.
+Only configure media sources you own or operate, or media you have permission
+to use and distribute through this app. Consumer streaming services such as
+Crunchyroll, Netflix and HIDIVE provide playback through their own players. A
+subscription does not grant permission to extract or retransmit their manifests
+through another app. Aniverse does not scrape those services; it surfaces
+official external episode links supplied by AniList.
 
 The research and supported managed-video URL formats are documented in
 [STREAM-SERVER-RESEARCH.md](STREAM-SERVER-RESEARCH.md).

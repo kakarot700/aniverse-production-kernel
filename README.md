@@ -25,7 +25,7 @@ npm run build
 No configuration is needed to start: the catalog is live on first run and the
 bundled reference streams give you working playback immediately.
 
-To connect licensed anime media, copy `.env.example` to `.env.local` and paste
+To connect an anime media source, copy `.env.example` to `.env.local` and paste
 an HLS/MP4 URL or template into any of the 12 `ANIVERSE_SERVER_XX_URL` slots.
 The slot activates on restart; no player code change is required.
 
@@ -89,11 +89,12 @@ sync are all verifiable before you plug anything in. They rank last, are
 grouped and labelled as `Reference` in the UI, and switch off with
 `ANIVERSE_ENABLE_REFERENCE_STREAMS=false`.
 
-> Configure only sources you own, operate, or are licensed to distribute from.
-> This repository deliberately ships no content servers and no extractors for
-> third-party file hosts. For discovering where a title is legally streamable,
-> the catalog surfaces AniList's official `streamingEpisodes` links and
-> trailers on each episode.
+> Configure only media sources you own or operate, or have permission to use
+> and distribute through this app. This repository ships no content servers or
+> extractors for third-party file hosts or consumer streaming services. A
+> subscription does not grant permission to extract or retransmit a service's
+> manifests through another app. The catalog surfaces official episode links
+> and trailers supplied by AniList.
 
 ## Media proxy
 
