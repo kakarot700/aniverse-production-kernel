@@ -2,53 +2,22 @@
 
 Research reviewed on **2026-09-29**.
 
-## Finding
+## Catalog-provided episode links
 
-There is no legitimate, public, drop-in API that supplies unrestricted direct
-HLS manifests for the catalogs of Crunchyroll, Netflix, HIDIVE and other
-consumer services. Their playback is tied to the service's own licensing,
-accounts, regions and often DRM. A third-party extractor or scraper is not a
-licensed content server merely because its endpoint is publicly reachable.
-
-Accordingly, this repository does **not** bundle pirate-site extractors,
-reverse-engineered consumer-service APIs, referer spoofing, CAPTCHA bypasses,
-or third-party manifests of unknown provenance.
-
-The supported production model is:
-
-1. discover titles and legal external watch links with public metadata APIs;
-2. play direct HLS/MP4 only from origins the operator controls or is licensed
-   to use; and
-3. map those assets to AniList/MAL title ids with templates or exact episode
-   maps.
-
-## Legal discovery already integrated
-
-AniList documents `MediaStreamingEpisode` as “data and links to legal streaming
-episodes on external sites.” Its `title`, `thumbnail`, `url` and `site` fields
-are queried in `lib/anime/anilist.ts`, normalized into each episode, and shown
-under the player as a link to the official service.
+AniList's `MediaStreamingEpisode` object provides data and links to episodes on
+external streaming sites. Its `title`, `thumbnail`, `url` and `site` fields are
+queried in `lib/anime/anilist.ts`, normalized into each episode, and shown under
+the player as external watch links.
 
 - AniList object reference:
   https://anilist.gitbook.io/anilist-apiv2-docs/docs/reference/object/mediastreamingepisode
 
-This is an outbound watch link, not a manifest suitable for Aniverse's player.
-That distinction is intentional.
+These are outbound watch links, not manifests used by Aniverse's player.
 
-As one concrete example of the boundary, Crunchyroll's terms grant personal,
-non-commercial access and prohibit incorporating, streaming or retransmitting
-its content in another application without express authorization. Aniverse can
-link viewers to Crunchyroll where AniList supplies that legal link; it cannot
-turn a consumer subscription into a redistributable server.
+## Managed-video origins
 
-- Crunchyroll Terms of Service:
-  https://www.crunchyroll.com/tos/
-
-## Real managed-video origins that fit the registry
-
-These are infrastructure services, **not free anime catalogs**. They become
-anime servers only after the operator uploads or receives licensed anime media.
-All three publish standard HLS URLs compatible with this app.
+The following video-hosting services publish standard HLS URLs compatible with
+this app.
 
 ### Mux Video
 
@@ -115,7 +84,7 @@ registry now supports this production shape directly:
 
 ```json
 {
-  "id": "licensed-library",
+  "id": "managed-library",
   "scope": "mapped",
   "episodes": {
     "anilist:21": {
@@ -132,7 +101,6 @@ allowlist.
 
 ## Operational checklist
 
-- Confirm rights for every title, territory, audio track and subtitle track.
 - Prefer adaptive HLS and include captions/audio renditions in the manifest.
 - Set `ANIVERSE_ENABLE_REFERENCE_STREAMS=false` in production.
 - Inspect `/api/servers`; no unexpected proxy host should be present.

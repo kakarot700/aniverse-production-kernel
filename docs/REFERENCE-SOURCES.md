@@ -12,9 +12,7 @@
   used as the secondary source: `/anime`, `/top/anime`, `/seasons/{year}/{season}`,
   `/seasons/now`, `/anime/{id}/full` and `/anime/{id}/episodes`.
 
-Both are third-party services with their own terms and rate limits. Credit
-them in the UI, keep request volume reasonable, and do not mirror their
-databases wholesale.
+Credit AniList and Jikan/MyAnimeList in the UI (the footer already does).
 
 ## Reference media streams
 

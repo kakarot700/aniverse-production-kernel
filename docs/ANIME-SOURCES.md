@@ -35,7 +35,7 @@ AniList publishes `episodes` (the count), `nextAiringEpisode` (how far a
 currently-airing show has got) and `streamingEpisodes` (official watch links
 with inconsistent `Episode N -` title prefixes). `buildEpisodeList` reconciles
 all three into a dense, numbered list where each entry knows whether it has
-aired and where it can be watched legally. Titles with 1000+ episodes are
+aired and includes an external watch link when one is provided. Titles with 1000+ episodes are
 chunked into blocks of 100 in the UI.
 
 ## Caching and rate limits
@@ -91,11 +91,9 @@ sandbox this was built in had no egress to it. The AniList mapper is therefore
 still covered only by hand-written cases, and is the most likely place for a
 similar shape mismatch to be hiding. Recording one is the obvious next step.
 
-## Attribution and terms
+## Attribution
 
-AniList and Jikan/MyAnimeList data is used under their public API terms.
-Credit them in your UI (the footer already does), keep request volume within
-their published limits, and do not mirror their databases wholesale.
+Credit AniList and Jikan/MyAnimeList in your UI (the footer already does).
 
 Artwork is hot-linked from the AniList CDN (`s4.anilist.co`) and the MAL CDN.
 `<img>` tags use `referrerPolicy="no-referrer"` and fall back to a bundled

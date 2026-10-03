@@ -26,8 +26,8 @@ components/MasterPlayer.tsx  hls.js/native MP4 playback
 
 ## Fastest setup: 12 URL slots
 
-Copy the environment file and paste an HLS/MP4 URL or URL template that you own
-or have permission to use into any of the 12 prepared slots:
+Copy the environment file and paste an HLS/MP4 URL or URL template into any of
+the 12 prepared slots:
 
 ```sh
 cp .env.example .env.local
@@ -172,7 +172,7 @@ directly; exact episode entries take precedence over a `titles` fallback:
 ```
 
 The example values are URL formats, not bundled videos. Replace every `PASTE_*`
-component with a playback URL for media you control.
+component with the playback URL.
 
 ## Fields
 
@@ -250,11 +250,9 @@ curl -s localhost:3000/api/servers | jq
 curl -s "localhost:3000/api/watch/anilist:21/7" | jq '.mirrors[] | {serverName, manifestUrl, requiresProxy}'
 ```
 
-## Source and use boundaries
+## Related source documentation
 
-Only configure media sources you own or operate, or media you have permission
-to use and distribute through this app. Official external episode links supplied
-by AniList are shown in the catalog.
+Official external episode links supplied by AniList are shown in the catalog.
 
 The research and supported managed-video URL formats are documented in
 [STREAM-SERVER-RESEARCH.md](STREAM-SERVER-RESEARCH.md).

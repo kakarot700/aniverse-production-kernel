@@ -17,7 +17,7 @@ library and as the fallback image. See `public/posters/ASSET-NOTES.txt`.
 `lib/preview-url.ts`: only a same-origin `/previews/<slug>.webm` path is
 accepted, so a card never issues a request for a missing or remote file.
 
-When an authorized clip is available, place it at
+To add a preview clip, place it at
 `public/previews/<slug>.webm` and set `previewUrl` on the record. The card
 waits 300 ms after hover or keyboard focus, then mounts a muted looping video
 over the fixed poster frame; the poster stays underneath until the video can

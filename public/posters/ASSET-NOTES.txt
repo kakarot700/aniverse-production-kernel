@@ -8,10 +8,8 @@ They are still used for two things:
   2. the fallback image a card shows if a remote poster fails to load.
 
 Provenance: collected from visual-search results for layout prototyping; no
-visible stock watermark was observed, but source licensing has not been
-independently verified. `bleach-tybw.jpg` is an original AI-generated
-placeholder. Replace all of them with artwork you own or have licensed before
-a public commercial launch.
+visible stock watermark was observed. `bleach-tybw.jpg` is an original
+AI-generated placeholder.
 
 No video clips ship with this repository. See docs/PREVIEW-ASSETS.md for how
-to add an authorized `/previews/<slug>.webm` hover loop.
+to add a `/previews/<slug>.webm` hover loop.

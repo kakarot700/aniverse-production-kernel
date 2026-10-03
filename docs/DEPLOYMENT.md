@@ -12,9 +12,9 @@
 ## Catalog sources
 
 - No credentials are required. AniList and Jikan are public.
-- Respect their rate limits. The in-process TTL cache (5 min for catalog
-  pages, 30 min for details) plus request coalescing covers a single instance;
-  add a shared cache or CDN for multi-instance deployments.
+- The in-process TTL cache (5 min for catalog pages, 30 min for details) plus
+  request coalescing covers a single instance; add a shared cache or CDN for
+  multi-instance deployments.
 - Outbound HTTPS to `graphql.anilist.co` and `api.jikan.moe` must be allowed
   from the server. Without it the catalog reports `degraded: true` and only
   browsers that can reach AniList themselves will see the full library.
@@ -23,8 +23,8 @@
 
 ## Stream servers
 
-- Add origins you own, operate or are licensed to distribute from: paste them
-  into `config/stream-servers.json` (auto-detected, has ready brackets), or use
+- Add stream origins in `config/stream-servers.json` (auto-detected, has ready
+  brackets), or use
   the `ANIVERSE_SERVER_01_URL` … `ANIVERSE_SERVER_12_URL` quick slots,
   `ANIVERSE_STREAM_SERVERS`, or `ANIVERSE_STREAM_SERVERS_FILE`. See
   `docs/STREAM-SERVERS.md`.
